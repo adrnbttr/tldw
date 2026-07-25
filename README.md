@@ -1,0 +1,180 @@
+<div align="center">
+
+<img src="./.github/assets/banner.svg" alt="tldw — too long; didn't watch" width="100%" />
+
+<br/>
+
+**A Manifest V3 browser extension that turns embedded YouTube &amp; Vimeo videos into structured Markdown summaries — even behind authentication.**
+
+Runs entirely in your browser, with your own API keys. No backend. No subscription. No tracking.
+
+<br/>
+
+[![CI](https://github.com/adrnbttr/tldw/actions/workflows/ci.yml/badge.svg)](https://github.com/adrnbttr/tldw/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-4f46e5.svg)](./LICENSE)
+[![Manifest V3](https://img.shields.io/badge/manifest-v3-4f46e5.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
+[![TypeScript](https://img.shields.io/badge/typescript-strict-3178c6.svg)](https://www.typescriptlang.org/)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-22c55e.svg)](./CONTRIBUTING.md)
+
+</div>
+
+---
+
+## Table of contents
+
+- [Why](#why)
+- [Preview](#preview)
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Tech stack](#tech-stack)
+- [Project structure](#project-structure)
+- [Development](#development)
+- [Roadmap](#roadmap)
+- [Privacy &amp; legal](#privacy--legal)
+- [License](#license)
+
+## Why
+
+Educational platforms embed hours of video you don't have time to watch in full. **tldw** detects the video on the page, retrieves the spoken content — captions first, an audio-transcription fallback when there are none — and generates a **consistently structured** summary you can download as Markdown.
+
+Because two summaries from two different extraction paths must read the same, the model never controls the layout: it returns structured JSON, and the Markdown is rendered locally from a **versioned template**. Same formalism, every time.
+
+## Preview
+
+<div align="center">
+  <img src="./.github/assets/popup-mockup.svg" alt="tldw popup: video list on the left, rendered summary with download and copy actions on the right" width="82%" />
+</div>
+
+## Features
+
+- 🎯 **Smart detection** — embedded YouTube &amp; Vimeo players, native `<video>`, and dynamically injected ones via a `MutationObserver`.
+- 🔐 **Works behind authentication** — extraction runs in the tab's own session context.
+- 🪜 **Best-effort cascade** — captions first, audio transcription as a fallback *(Phase 3)*, then an explicit typed error. Never a silent failure.
+- 📐 **Identical output every time** — structured JSON → local Markdown rendering from a versioned template.
+- 🧠 **Bring your own model** — Claude Sonnet (recommended) or Gemini Flash via OpenRouter, with a hierarchical strategy for very long transcripts.
+- 💾 **Export &amp; history** — one-click `.md` download, clipboard copy, and a local summary cache.
+- 🔒 **Private by design** — keys live in `chrome.storage.local` and are only ever sent to the provider they belong to.
+
+## How it works
+
+The extension tries to obtain the video's text in successive levels, dropping one rung on each failure. **Every level produces the same normalized `Transcript` object**, so the summarizer is agnostic to where the text came from — that is what guarantees a constant output formalism.
+
+```
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Level 1 — Caption track                                       │
+  │    YouTube: auto/manual captions   ·   Vimeo: text_tracks      │
+  └───────────────┬──────────────────────────────────────────────┘
+                  │ NO_CAPTIONS_AVAILABLE
+                  ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Level 2 — Audio transcription                     [Phase 3]   │
+  │    capture media → isolate audio (ffmpeg.wasm) → Whisper       │
+  └───────────────┬──────────────────────────────────────────────┘
+                  │ fail
+                  ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Level 3 — Explicit, typed error (what was tried & why)        │
+  └──────────────────────────────────────────────────────────────┘
+                  │
+                  ▼ Transcript ──▶ Summarizer ──▶ template ──▶ Markdown
+```
+
+Full details in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+
+## Quick start
+
+> Requires **Node ≥ 18**.
+
+```bash
+git clone https://github.com/adrnbttr/tldw.git
+cd tldw
+npm install
+npm run build        # bundles the extension into dist/
+```
+
+Load it in Chrome:
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. **Load unpacked** → select the `dist/` folder
+
+For live development with hot-reload, run `npm run dev` instead.
+
+## Configuration
+
+Open the popup → **⚙️ Settings**:
+
+| Setting | Purpose |
+|---|---|
+| **OpenRouter API key** | Summary generation. Grab one at [openrouter.ai/keys](https://openrouter.ai/keys). |
+| **Transcription API key** | Audio fallback only (Phase 3). |
+| **Summary model** | `Claude Sonnet` (recommended for format fidelity) or `Gemini Flash` for very long transcripts. |
+| **Output language / detail level** | Tune tone and length. |
+
+Keys are stored locally and never leave your browser except toward the provider they target. See [`docs/PRIVACY.md`](./docs/PRIVACY.md).
+
+## Usage
+
+1. Open a page with a video and start playback.
+2. Click the tldw icon — detected videos are listed.
+3. Hit **Résumer**. Processing continues even if you close the popup.
+4. Read the rendered summary, then **Download (.md)** or **Copy**.
+
+## Tech stack
+
+| Area | Choice |
+|---|---|
+| Platform | Manifest V3 (Chrome / Edge) |
+| Language | TypeScript (strict) |
+| UI | Preact |
+| Build | Vite + `@crxjs/vite-plugin` |
+| Tests | Vitest |
+| Quality | ESLint + Prettier, GitHub Actions CI |
+| APIs | OpenRouter (summaries) · Whisper (audio fallback) |
+
+## Project structure
+
+```
+src/
+├── background/     service worker + orchestrator (the cascade)
+├── content/        DOM detection (pure helpers in detect.ts)
+├── popup/          Preact UI + components (list · processing · result · settings)
+├── adapters/       youtube.ts · vimeo.ts · registry
+├── transcription/  audio-fallback interface, isolated (Phase 3)
+├── summarizer/     openrouter.ts · versioned template · hierarchical summary
+├── storage/        chrome.storage wrappers
+├── shared/         format & markdown helpers
+└── types/          the shared contracts — single source of truth
+```
+
+## Development
+
+```bash
+npm run dev      # Vite dev server + HMR
+npm run build    # typecheck + production build
+npm test         # unit tests (Vitest)
+npm run lint     # ESLint + Prettier check
+npm run format   # apply Prettier
+```
+
+Contributions are welcome — see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+
+## Roadmap
+
+- [x] **Phase 1** — detection, YouTube adapter, OpenRouter summary, popup, export
+- [x] **Phase 2** — Vimeo adapter (level 1: `text_tracks`)
+- [ ] **Phase 3** — audio transcription fallback (`ffmpeg.wasm` + Whisper)
+- [ ] **Phase 4** — batch processing, history browser, multiple templates, quota handling
+
+Detailed roadmap in [`docs/ROADMAP.md`](./docs/ROADMAP.md).
+
+## Privacy &amp; legal
+
+Extracting content behind authentication may be governed by a site's terms of use. **Confirming that your usage is permitted is your responsibility.** tldw is built for personal use on content you legitimately have access to, and never attempts to bypass DRM — encrypted media surfaces a `MEDIA_PROTECTED` error instead. See [`docs/PRIVACY.md`](./docs/PRIVACY.md).
+
+## License
+
+[MIT](./LICENSE) © Adrien Bouttier

@@ -1,0 +1,75 @@
+<svg width="1280" height="360" viewBox="0 0 1280 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="tldw — too long; didn't watch">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="360" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f1020"/>
+      <stop offset="0.55" stop-color="#171734"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="18" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="360" rx="24" fill="url(#bg)"/>
+
+  <!-- soft accent orbs -->
+  <circle cx="1120" cy="70" r="150" fill="#4f46e5" opacity="0.20" filter="url(#glow)"/>
+  <circle cx="1180" cy="300" r="110" fill="#818cf8" opacity="0.14" filter="url(#glow)"/>
+
+  <!-- wordmark -->
+  <text x="80" y="150" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="96" font-weight="700" fill="#ffffff" letter-spacing="-2">tldw</text>
+  <rect x="82" y="172" width="230" height="6" rx="3" fill="url(#accent)"/>
+
+  <text x="84" y="220" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="27" fill="#c7d2fe" font-weight="500">too long; didn&#39;t watch</text>
+  <text x="84" y="258" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="19" fill="#8b90c0">Turn embedded YouTube &amp; Vimeo videos into structured Markdown summaries.</text>
+
+  <!-- pipeline pills -->
+  <g font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="16" font-weight="600">
+    <g>
+      <rect x="84" y="292" width="118" height="40" rx="20" fill="#ffffff" opacity="0.06"/>
+      <rect x="84" y="292" width="118" height="40" rx="20" fill="none" stroke="#4f46e5" stroke-opacity="0.5"/>
+      <text x="143" y="317" fill="#e0e7ff" text-anchor="middle">Detect</text>
+    </g>
+    <text x="216" y="317" fill="#4f46e5" text-anchor="middle" font-size="18">→</text>
+    <g>
+      <rect x="232" y="292" width="140" height="40" rx="20" fill="#ffffff" opacity="0.06"/>
+      <rect x="232" y="292" width="140" height="40" rx="20" fill="none" stroke="#4f46e5" stroke-opacity="0.5"/>
+      <text x="302" y="317" fill="#e0e7ff" text-anchor="middle">Transcript</text>
+    </g>
+    <text x="386" y="317" fill="#4f46e5" text-anchor="middle" font-size="18">→</text>
+    <g>
+      <rect x="402" y="292" width="150" height="40" rx="20" fill="#ffffff" opacity="0.06"/>
+      <rect x="402" y="292" width="150" height="40" rx="20" fill="none" stroke="#4f46e5" stroke-opacity="0.5"/>
+      <text x="477" y="317" fill="#e0e7ff" text-anchor="middle">Summarize</text>
+    </g>
+    <text x="566" y="317" fill="#4f46e5" text-anchor="middle" font-size="18">→</text>
+    <g>
+      <rect x="582" y="292" width="132" height="40" rx="20" fill="url(#accent)"/>
+      <text x="648" y="317" fill="#ffffff" text-anchor="middle">Export .md</text>
+    </g>
+  </g>
+
+  <!-- right-side glyph: stacked caption lines condensing into a summary -->
+  <g transform="translate(900,86)" opacity="0.95">
+    <rect x="0" y="0" width="300" height="188" rx="16" fill="#ffffff" opacity="0.05"/>
+    <rect x="0" y="0" width="300" height="188" rx="16" fill="none" stroke="#4f46e5" stroke-opacity="0.35"/>
+    <g fill="#6b70a8">
+      <rect x="22" y="26" width="230" height="9" rx="4.5"/>
+      <rect x="22" y="44" width="256" height="9" rx="4.5"/>
+      <rect x="22" y="62" width="180" height="9" rx="4.5"/>
+    </g>
+    <line x1="22" y1="92" x2="278" y2="92" stroke="#4f46e5" stroke-opacity="0.4" stroke-dasharray="4 6"/>
+    <g fill="#a5b4fc">
+      <rect x="22" y="112" width="120" height="11" rx="5.5"/>
+    </g>
+    <g fill="#c7d2fe">
+      <circle cx="27" cy="146" r="3"/><rect x="40" y="141" width="150" height="9" rx="4.5"/>
+      <circle cx="27" cy="166" r="3"/><rect x="40" y="161" width="120" height="9" rx="4.5"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,53 @@
+import type { DetectedVideo } from './video';
+import type { Summary } from './summary';
+import type { TldwErrorCode } from './errors';
+
+/**
+ * The typed message protocol between contexts.
+ *
+ * - popup  → background : requests (list videos, summarize, cancel, ...)
+ * - background → popup  : progress + terminal results, pushed via chrome.runtime
+ *
+ * Long jobs run in the service worker, so the popup can close and reopen and just
+ * re-subscribe to the current job state (F2).
+ */
+
+/** Ordered steps of a summarization job, shown in the processing view (F2). */
+export type JobStep = 'detect' | 'captions' | 'audio_capture' | 'transcription' | 'summarize';
+
+export type JobStepStatus = 'pending' | 'active' | 'done' | 'skipped' | 'failed';
+
+export interface JobProgress {
+  videoId: string;
+  step: JobStep;
+  status: JobStepStatus;
+  /** Optional human-readable detail, e.g. "3 min 20 / 12 min". */
+  detail?: string;
+}
+
+export type JobState =
+  | { phase: 'idle' }
+  | { phase: 'running'; videoId: string; steps: JobProgress[] }
+  | { phase: 'done'; videoId: string; summary: Summary }
+  | { phase: 'error'; videoId: string; code: TldwErrorCode; message: string };
+
+/** popup → background */
+export type Request =
+  | { type: 'LIST_VIDEOS' }
+  | { type: 'GET_JOB_STATE'; videoId: string }
+  | { type: 'SUMMARIZE'; video: DetectedVideo }
+  | { type: 'CANCEL'; videoId: string };
+
+/** Response to a `Request` (via sendResponse). */
+export type Response =
+  | { ok: true; videos: DetectedVideo[] }
+  | { ok: true; state: JobState }
+  | { ok: true }
+  | { ok: false; code: TldwErrorCode; message: string };
+
+/** background → popup (broadcast, fire-and-forget). */
+export type Broadcast =
+  { type: 'JOB_PROGRESS'; progress: JobProgress } | { type: 'JOB_STATE'; state: JobState };
+
+/** content → background (detection results for the active tab). */
+export type ContentMessage = { type: 'VIDEOS_DETECTED'; videos: DetectedVideo[] };

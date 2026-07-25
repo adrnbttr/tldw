@@ -1,0 +1,57 @@
+import { describe, it, expect } from 'vitest';
+import { parseSummaryContent, splitIntoBlocks } from './index';
+import { getTemplate } from './template';
+
+describe('parseSummaryContent', () => {
+  it('parses raw JSON', () => {
+    const content = parseSummaryContent(
+      '{"tldr":"x","keyPoints":["a","b"],"sections":[],"glossary":[],"takeaways":["t"]}',
+    );
+    expect(content.tldr).toBe('x');
+    expect(content.keyPoints).toEqual(['a', 'b']);
+    expect(content.takeaways).toEqual(['t']);
+  });
+
+  it('tolerates code fences', () => {
+    const content = parseSummaryContent('```json\n{"tldr":"y"}\n```');
+    expect(content.tldr).toBe('y');
+    expect(content.keyPoints).toEqual([]);
+  });
+
+  it('throws on invalid JSON', () => {
+    expect(() => parseSummaryContent('not json at all')).toThrow();
+  });
+});
+
+describe('splitIntoBlocks', () => {
+  it('keeps blocks under the limit', () => {
+    const text = Array.from({ length: 50 }, (_, i) => `Phrase ${i}.`).join(' ');
+    const blocks = splitIntoBlocks(text, 60);
+    expect(blocks.length).toBeGreaterThan(1);
+    for (const b of blocks) expect(b.length).toBeLessThanOrEqual(70);
+  });
+});
+
+describe('template rendering', () => {
+  it('produces a stable Markdown structure', () => {
+    const md = getTemplate('default-v1').render({
+      title: 'Titre',
+      provider: 'youtube',
+      durationLabel: '30 min 47',
+      transcriptSource: 'youtube_captions',
+      isoDate: '2026-07-24',
+      content: {
+        tldr: 'En bref.',
+        keyPoints: ['Point 1', 'Point 2'],
+        sections: [{ heading: 'Intro', body: 'Corps.' }],
+        glossary: [{ term: 'Terme', definition: 'Déf.' }],
+        takeaways: ['À retenir.'],
+      },
+    });
+    expect(md).toContain('# Titre');
+    expect(md).toContain('## En bref');
+    expect(md).toContain('## Points clés');
+    expect(md).toContain('**Méthode :** Sous-titres YouTube');
+    expect(md).toContain('- **Terme** — Déf.');
+  });
+});
