@@ -1,0 +1,21 @@
+<svg width="440" height="128" viewBox="0 0 440 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="tldw logo">
+  <defs>
+    <linearGradient id="lbg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- mark -->
+  <rect width="128" height="128" rx="30" fill="url(#lbg)"/>
+  <path d="M52 26 L52 66 L88 46 Z" fill="#ffffff" stroke="#ffffff" stroke-width="9" stroke-linejoin="round"/>
+  <g fill="#ffffff">
+    <rect x="34" y="82" width="60" height="9" rx="4.5"/>
+    <rect x="34" y="97" width="60" height="9" rx="4.5" opacity="0.9"/>
+    <rect x="34" y="112" width="38" height="9" rx="4.5" opacity="0.72"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="156" y="74" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="60" font-weight="700" fill="#111827" letter-spacing="-2">tldw</text>
+  <text x="158" y="104" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="17" fill="#6b7280">too long; didn&#39;t watch</text>
+</svg>

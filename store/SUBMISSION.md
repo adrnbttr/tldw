@@ -1,5 +1,8 @@
 # Chrome Web Store — submission checklist
 
+> **Status: not currently planned.** tldw is used personally via Developer mode
+> (see the README). This folder is kept ready in case publishing happens later.
+
 ## 1. Package
 
 ```bash
@@ -17,13 +20,13 @@ the sizes below (e.g. with an SVG-to-PNG tool or a browser screenshot).
 
 | Asset | Size | Required | Source |
 |---|---|---|---|
-| Store icon | 128×128 | ✅ | `public/icons/icon-128.png` (replace the placeholder with real art first) |
+| Store icon | 128×128 | ✅ | `public/icons/icon-128.png` (rendered from `.github/assets/icon.svg`) |
 | Screenshot(s) | 1280×800 or 640×400 | ✅ (1–5) | Real captures of the popup — list, processing, result, settings |
-| Small promo tile | 440×280 | ✅ | Derive from `.github/assets/banner.svg` |
+| Small promo tile | 440×280 | ✅ | Derive from `.github/assets/logo.svg` or `banner.svg` |
 | Marquee promo tile | 1400×560 | optional | Derive from `.github/assets/banner.svg` |
 
-> The placeholder app icon (a solid indigo square) must be replaced with real
-> artwork before submission — see the "Branding" task.
+> The app icon is real artwork now (`npm run icons` regenerates the PNGs from the
+> SVG). Screenshots still need to be captured from the running extension.
 
 ## 3. Listing copy
 

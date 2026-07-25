@@ -87,7 +87,12 @@ Full details in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 ## Quick start
 
-> Requires **Node ≥ 18**.
+> **No account, no Web Store, no fee.** tldw installs as an unpacked extension in
+> Developer mode. It's built for personal use — publishing to the Chrome Web Store
+> isn't planned for now (the packaging groundwork lives in [`store/`](./store/) in
+> case that changes).
+
+Requires **Node ≥ 18**.
 
 ```bash
 git clone https://github.com/adrnbttr/tldw.git
@@ -99,10 +104,20 @@ npm run build        # bundles the extension into dist/
 Load it in Chrome:
 
 1. Open `chrome://extensions`
-2. Enable **Developer mode**
+2. Enable **Developer mode** (top-right)
 3. **Load unpacked** → select the `dist/` folder
 
 For live development with hot-reload, run `npm run dev` instead.
+
+### Using it on another computer
+
+Same thing — no account required. Either:
+
+- copy the built `dist/` folder over and **Load unpacked** it, or
+- clone the repo there and run `npm install && npm run build`.
+
+Unpacked extensions don't auto-update, so to get changes just `git pull` and
+rebuild (or recopy `dist/`).
 
 ## Configuration
 
@@ -178,7 +193,7 @@ Detailed roadmap in [`docs/ROADMAP.md`](./docs/ROADMAP.md).
 
 Extracting content behind authentication may be governed by a site's terms of use. **Confirming that your usage is permitted is your responsibility.** tldw is built for personal use on content you legitimately have access to, and never attempts to bypass DRM — encrypted media surfaces a `MEDIA_PROTECTED` error instead.
 
-Read the [privacy policy](https://www.adrienbouttier.com/tldw/) · [`docs/PRIVACY.md`](./docs/PRIVACY.md). Chrome Web Store packaging and submission notes live in [`store/`](./store/).
+Read the [privacy policy](https://www.adrienbouttier.com/tldw/) · [`docs/PRIVACY.md`](./docs/PRIVACY.md).
 
 ## License
 
