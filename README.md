@@ -94,6 +94,16 @@ planned (the groundwork lives in [`store/`](./store/) if that ever changes).
 **Prerequisites:** [Node](https://nodejs.org) ≥ 18 (ships with npm) and a Chromium
 browser — Chrome or Edge.
 
+### Fastest: one command
+
+```bash
+git clone https://github.com/adrnbttr/tldw.git && cd tldw && ./install.sh
+```
+
+`install.sh` checks your setup, installs, builds, and prints a guided walkthrough
+(with the `dist/` path copied to your clipboard). Then just do step 2 and 3 below.
+Prefer to do it by hand? The manual steps are right here:
+
 ### 1 · Build it
 
 ```bash
@@ -119,12 +129,10 @@ used by the audio fallback). Keys are stored locally — see [Configuration](#co
 
 ### Updating
 
-Unpacked extensions don't auto-update. After pulling changes:
+Unpacked extensions don't auto-update. After pulling changes, rebuild:
 
 ```bash
-git pull
-npm install            # only if dependencies changed
-npm run build
+git pull && ./install.sh      # or: npm install && npm run build
 ```
 
 Then open `chrome://extensions` and click the **↻ reload** icon on the tldw card —
