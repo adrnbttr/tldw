@@ -1,5 +1,6 @@
 import type { Broadcast, ContentMessage, JobProgress, JobState, Request, Response } from '@/types';
-import { runJob, getJobState, cancelJob } from './orchestrator';
+import type { BatchState } from '@/types';
+import { runJob, runBatch, getJobState, getBatchState, cancelJob } from './orchestrator';
 import { installMediaCapture } from './media-capture';
 
 installMediaCapture();
@@ -22,6 +23,12 @@ function broadcast(state: JobState, progress?: JobProgress): void {
       // No popup listening — expected, jobs keep running regardless.
     });
   }
+}
+
+function broadcastBatch(state: BatchState): void {
+  chrome.runtime.sendMessage({ type: 'BATCH_STATE', state } satisfies Broadcast).catch(() => {
+    // No popup listening — expected.
+  });
 }
 
 chrome.runtime.onMessage.addListener(
@@ -50,6 +57,17 @@ chrome.runtime.onMessage.addListener(
       // Fire and forget — the job runs in the worker; progress is broadcast.
       void runJob(message.video, broadcast);
       sendResponse({ ok: true });
+      return false;
+    }
+
+    if (message.type === 'SUMMARIZE_BATCH') {
+      void runBatch(message.videos, broadcast, broadcastBatch);
+      sendResponse({ ok: true });
+      return false;
+    }
+
+    if (message.type === 'GET_BATCH_STATE') {
+      sendResponse({ ok: true, batch: getBatchState() });
       return false;
     }
 

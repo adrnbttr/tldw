@@ -59,8 +59,13 @@ export async function transcribeAudio(
     throw new TldwError('TRANSCRIPTION_API_ERROR', 'Network error calling Whisper.', String(err));
   }
 
-  if (response.status === 429) {
-    throw new TldwError('QUOTA_EXCEEDED', 'Transcription quota exceeded.');
+  if (response.status === 429 || response.status === 402) {
+    const retry = response.headers.get('retry-after');
+    throw new TldwError(
+      'QUOTA_EXCEEDED',
+      'Transcription quota/credits exceeded.',
+      retry ? `réessayez dans ${retry}s` : undefined,
+    );
   }
   if (!response.ok) {
     const body = await response.text().catch(() => '');

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import type { DetailLevel, Settings } from '@/types';
 import { AVAILABLE_MODELS, DEFAULT_SETTINGS } from '@/types';
 import { getSettings, saveSettings } from '@/storage';
+import { listTemplates } from '@/summarizer/template';
 
 interface Props {
   onClose: () => void;
@@ -96,6 +97,20 @@ export function SettingsView({ onClose }: Props) {
           {DETAIL_LEVELS.map((d) => (
             <option key={d.value} value={d.value}>
               {d.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Template de résumé</span>
+        <select
+          value={settings.templateId}
+          onChange={(e) => update('templateId', (e.target as HTMLSelectElement).value)}
+        >
+          {listTemplates().map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
             </option>
           ))}
         </select>

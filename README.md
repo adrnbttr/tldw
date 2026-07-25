@@ -55,7 +55,8 @@ Because two summaries from two different extraction paths must read the same, th
 - 🪜 **Best-effort cascade** — captions first, audio transcription as a fallback (`ffmpeg.wasm` + Whisper), then an explicit typed error. Never a silent failure.
 - 📐 **Identical output every time** — structured JSON → local Markdown rendering from a versioned template.
 - 🧠 **Bring your own model** — Claude Sonnet (recommended) or Gemini Flash via OpenRouter, with a hierarchical strategy for very long transcripts.
-- 💾 **Export &amp; history** — one-click `.md` download, clipboard copy, and a local summary cache.
+- 💾 **Export, history &amp; batch** — one-click `.md` download, clipboard copy, a browsable local history, and multi-video batch processing into a single file.
+- 🎨 **Selectable templates** — `default` (full) or `compact`, chosen in Settings.
 - 🔒 **Private by design** — keys live in `chrome.storage.local` and are only ever sent to the provider they belong to.
 
 ## How it works
@@ -169,7 +170,7 @@ Contributions are welcome — see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 - [x] **Phase 1** — detection, YouTube adapter, OpenRouter summary, popup, export
 - [x] **Phase 2** — Vimeo adapter (level 1: `text_tracks`)
 - [x] **Phase 3** 🧪 — audio transcription fallback (`ffmpeg.wasm` + Whisper, in an offscreen document) — *implemented, pending validation on a real stream*
-- [ ] **Phase 4** — batch processing, history browser, multiple templates, quota handling
+- [x] **Phase 4** — batch processing, history browser, multiple templates, quota handling
 
 Detailed roadmap in [`docs/ROADMAP.md`](./docs/ROADMAP.md).
 

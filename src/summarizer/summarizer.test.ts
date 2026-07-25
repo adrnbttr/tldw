@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseSummaryContent, splitIntoBlocks } from './index';
-import { getTemplate } from './template';
+import { getTemplate, listTemplates } from './template';
 
 describe('parseSummaryContent', () => {
   it('parses raw JSON', () => {
@@ -53,5 +53,32 @@ describe('template rendering', () => {
     expect(md).toContain('## Points clés');
     expect(md).toContain('**Méthode :** Sous-titres YouTube');
     expect(md).toContain('- **Terme** — Déf.');
+  });
+
+  it('exposes at least the default and compact templates', () => {
+    const ids = listTemplates().map((t) => t.id);
+    expect(ids).toContain('default-v1');
+    expect(ids).toContain('compact-v1');
+  });
+
+  it('compact template omits Développement and glossary', () => {
+    const md = getTemplate('compact-v1').render({
+      title: 'Titre',
+      provider: 'youtube',
+      durationLabel: '5 min',
+      transcriptSource: 'youtube_captions',
+      isoDate: '2026-07-24',
+      content: {
+        tldr: 'Bref.',
+        keyPoints: ['P1'],
+        sections: [{ heading: 'Intro', body: 'X' }],
+        glossary: [{ term: 'T', definition: 'D' }],
+        takeaways: ['R1'],
+      },
+    });
+    expect(md).toContain('## En bref');
+    expect(md).toContain('## À retenir');
+    expect(md).not.toContain('## Développement');
+    expect(md).not.toContain('## Notions');
   });
 });

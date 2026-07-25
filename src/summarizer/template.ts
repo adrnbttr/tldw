@@ -89,8 +89,44 @@ const defaultTemplate: Template = {
   },
 };
 
+/**
+ * Compact template — same structured JSON input, but renders only the essentials
+ * (En bref · Points clés · À retenir). Useful for quick scanning.
+ */
+const compactTemplate: Template = {
+  id: 'compact-v1',
+  label: 'Compact',
+  schemaHint: defaultTemplate.schemaHint,
+  render({ title, provider, durationLabel, transcriptSource, isoDate, content }) {
+    const lines: string[] = [];
+    lines.push(`# ${title}`);
+    lines.push('');
+    lines.push(
+      `**Source :** ${provider} · **Durée :** ${durationLabel} · **Extrait le :** ${isoDate}`,
+    );
+    lines.push(`**Méthode :** ${sourceLabel(transcriptSource)}`);
+    lines.push('');
+    lines.push('## En bref');
+    lines.push(content.tldr.trim());
+    lines.push('');
+    lines.push('## Points clés');
+    for (const point of content.keyPoints) lines.push(`- ${point.trim()}`);
+    lines.push('');
+    lines.push('## À retenir');
+    for (const item of content.takeaways) lines.push(`- ${item.trim()}`);
+    lines.push('');
+    return (
+      lines
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim() + '\n'
+    );
+  },
+};
+
 const TEMPLATES: Record<string, Template> = {
   [defaultTemplate.id]: defaultTemplate,
+  [compactTemplate.id]: compactTemplate,
 };
 
 export function getTemplate(id: string): Template {

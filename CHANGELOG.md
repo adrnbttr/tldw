@@ -20,6 +20,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Whisper size limit, sequential transcription with reassembly and overlap
   de-duplication, temp-file cleanup, and a configurable global timeout. End-to-end
   extraction is pending validation against a real DRM-free stream.
+- **Phase 4 — polish.** Batch processing (select several videos, single
+  concatenated `.md` export), a browsable summary history in the popup, a second
+  selectable summary template (`compact`), and finer quota handling (HTTP 429/402
+  with `Retry-After` surfaced to the user).
 - Normalized `Transcript` contract shared across all extraction paths.
 - Isolated `Transcriber` interface for the audio fallback.
 

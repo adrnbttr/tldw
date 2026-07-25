@@ -54,9 +54,11 @@ export async function chat(options: ChatOptions): Promise<string> {
     throw new TldwError('SUMMARY_API_ERROR', 'Network error calling OpenRouter.', String(err));
   }
 
-  if (response.status === 429) {
+  if (response.status === 429 || response.status === 402) {
     const body = await safeText(response);
-    throw new TldwError('QUOTA_EXCEEDED', 'OpenRouter quota exceeded.', body);
+    const retry = response.headers.get('retry-after');
+    const hint = retry ? `réessayez dans ${retry}s. ${body}` : body;
+    throw new TldwError('QUOTA_EXCEEDED', 'OpenRouter quota/credits exceeded.', hint.trim());
   }
   if (!response.ok) {
     const body = await safeText(response);

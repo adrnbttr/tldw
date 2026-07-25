@@ -18,3 +18,18 @@ export function downloadMarkdown(summary: Summary): void {
 export async function copyMarkdown(summary: Summary): Promise<void> {
   await navigator.clipboard.writeText(summary.markdown);
 }
+
+/** Concatenates several summaries into one Markdown document (F8 batch export). */
+export function concatMarkdown(summaries: Summary[]): string {
+  return summaries.map((s) => s.markdown.trim()).join('\n\n---\n\n') + '\n';
+}
+
+export function downloadBatchMarkdown(summaries: Summary[]): void {
+  const blob = new Blob([concatMarkdown(summaries)], {
+    type: 'text/markdown;charset=utf-8',
+  });
+  const url = URL.createObjectURL(blob);
+  chrome.downloads.download({ url, filename: `${isoDate()}-resumes-tldw.md`, saveAs: false }, () =>
+    setTimeout(() => URL.revokeObjectURL(url), 10_000),
+  );
+}

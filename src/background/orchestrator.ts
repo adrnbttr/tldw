@@ -1,4 +1,13 @@
-import type { DetectedVideo, JobState, JobProgress, JobStep, JobStepStatus } from '@/types';
+import type {
+  BatchItemResult,
+  BatchState,
+  DetectedVideo,
+  JobState,
+  JobProgress,
+  JobStep,
+  JobStepStatus,
+  Summary,
+} from '@/types';
 import { TldwError, messageFor } from '@/types';
 import { selectAdapter } from '@/adapters';
 import { audioTranscriber } from '@/transcription';
@@ -31,6 +40,58 @@ function initialSteps(videoId: string): JobProgress[] {
 
 export function getJobState(videoId: string): JobState {
   return jobs.get(videoId) ?? { phase: 'idle' };
+}
+
+let batchState: BatchState = { phase: 'idle' };
+
+export function getBatchState(): BatchState {
+  return batchState;
+}
+
+/**
+ * Batch processing (F8). Runs each video's job sequentially in the worker and
+ * aggregates the outcomes, so the popup can close and reopen mid-run.
+ */
+export async function runBatch(
+  videos: DetectedVideo[],
+  broadcast: Broadcaster,
+  broadcastBatch: (state: BatchState) => void,
+): Promise<void> {
+  const results: BatchItemResult[] = [];
+  const summaries: Summary[] = [];
+
+  const push = (currentTitle: string | null) => {
+    batchState = {
+      phase: 'running',
+      total: videos.length,
+      completed: results.length,
+      currentTitle,
+      results: [...results],
+    };
+    broadcastBatch(batchState);
+  };
+
+  push(videos[0]?.title ?? null);
+
+  for (const video of videos) {
+    push(video.title);
+    await runJob(video, broadcast);
+    const state = getJobState(video.id);
+    if (state.phase === 'done') {
+      summaries.push(state.summary);
+      results.push({ videoId: video.id, title: state.summary.title, ok: true });
+    } else if (state.phase === 'error') {
+      results.push({
+        videoId: video.id,
+        title: video.title ?? 'Vidéo sans titre',
+        ok: false,
+        message: state.message,
+      });
+    }
+  }
+
+  batchState = { phase: 'done', total: videos.length, results, summaries };
+  broadcastBatch(batchState);
 }
 
 export function cancelJob(videoId: string): void {

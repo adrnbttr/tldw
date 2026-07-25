@@ -36,18 +36,42 @@ export type Request =
   | { type: 'LIST_VIDEOS' }
   | { type: 'GET_JOB_STATE'; videoId: string }
   | { type: 'SUMMARIZE'; video: DetectedVideo }
+  | { type: 'SUMMARIZE_BATCH'; videos: DetectedVideo[] }
+  | { type: 'GET_BATCH_STATE' }
   | { type: 'CANCEL'; videoId: string };
+
+/** Outcome of one video within a batch run (F8). */
+export interface BatchItemResult {
+  videoId: string;
+  title: string;
+  ok: boolean;
+  message?: string;
+}
+
+export type BatchState =
+  | { phase: 'idle' }
+  | {
+      phase: 'running';
+      total: number;
+      completed: number;
+      currentTitle: string | null;
+      results: BatchItemResult[];
+    }
+  | { phase: 'done'; total: number; results: BatchItemResult[]; summaries: Summary[] };
 
 /** Response to a `Request` (via sendResponse). */
 export type Response =
   | { ok: true; videos: DetectedVideo[] }
   | { ok: true; state: JobState }
+  | { ok: true; batch: BatchState }
   | { ok: true }
   | { ok: false; code: TldwErrorCode; message: string };
 
 /** background → popup (broadcast, fire-and-forget). */
 export type Broadcast =
-  { type: 'JOB_PROGRESS'; progress: JobProgress } | { type: 'JOB_STATE'; state: JobState };
+  | { type: 'JOB_PROGRESS'; progress: JobProgress }
+  | { type: 'JOB_STATE'; state: JobState }
+  | { type: 'BATCH_STATE'; state: BatchState };
 
 /** content → background (detection results for the active tab). */
 export type ContentMessage = { type: 'VIDEOS_DETECTED'; videos: DetectedVideo[] };

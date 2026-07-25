@@ -41,12 +41,12 @@ offscreen document (the service worker has no DOM).
 **Validation target:** a Vimeo video without captions yields a summary using the
 *same* template.
 
-## Phase 4 — Polish
+## Phase 4 — Polish ✅
 
-- [ ] Batch processing (single concatenated file or archive) (F8)
-- [ ] History browser in the popup
-- [ ] Multiple templates
-- [ ] Fine-grained quota handling
+- [x] Batch processing — select several videos, single concatenated `.md` export (F8)
+- [x] History browser in the popup — reopen a past summary without reprocessing (F9)
+- [x] Multiple templates — `default` and `compact`, selectable in Settings (F7)
+- [x] Fine-grained quota handling — 429/402 + `Retry-After` surfaced to the user
 
 ## Open questions
 

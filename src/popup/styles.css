@@ -279,3 +279,72 @@ button.secondary {
   color: var(--fg);
   font-size: 13px;
 }
+
+.batch-btn {
+  margin-top: 12px;
+}
+
+.progress-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+  margin: 6px 0 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.current {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.batch-results {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.batch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.batch-row.ok .batch-icon {
+  color: #22c55e;
+}
+
+.batch-row.ko .batch-icon {
+  color: var(--danger);
+}
+
+.batch-error {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.history-item {
+  padding: 0;
+}
+
+.history-row {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--fg);
+  padding: 10px 12px;
+}
