@@ -7,9 +7,16 @@ export const es: Messages = {
     emptyTitle: 'No se encontró ningún vídeo en esta página.',
     emptyHint: 'Inicia la reproducción y vuelve a abrir este menú.',
     noTitle: 'Vídeo sin título',
+    videoLabel: 'Vídeo',
     untreatable: 'no compatible',
     summarize: 'Resumir',
     summarizeSelection: (count) => `Resumir la selección (${count})`,
+  },
+  transcription: {
+    fetchingMedia: 'Recuperando el flujo multimedia…',
+    extractingAudio: 'Extrayendo la pista de audio…',
+    assembling: (index, total) => `Ensamblando segmentos (${index}/${total})…`,
+    transcribing: (index, total, clock) => `Transcribiendo ${index}/${total} (${clock})…`,
   },
   processing: {
     back: '← Atrás',

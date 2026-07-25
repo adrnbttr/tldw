@@ -47,6 +47,7 @@ export const audioTranscriber: Transcriber = {
       title: video.title,
       duration: video.duration,
       language: settings.outputLanguage,
+      uiLanguage: settings.uiLanguage,
       transcriptionKey: settings.transcriptionKey,
       whisperModel: WHISPER_MODEL,
       sources,

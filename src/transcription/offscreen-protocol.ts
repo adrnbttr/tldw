@@ -16,6 +16,8 @@ export interface TranscribeJob {
   /** Known duration in seconds, if any (helps chunk planning). */
   duration: number | null;
   language: string;
+  /** UI language, so offscreen progress messages are localized. */
+  uiLanguage: string;
   transcriptionKey: string;
   whisperModel: string;
   /** Candidate media sources to try, best-first. */

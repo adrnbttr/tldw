@@ -7,9 +7,16 @@ export const en: Messages = {
     emptyTitle: 'No video found on this page.',
     emptyHint: 'Start playback, then reopen this menu.',
     noTitle: 'Untitled video',
+    videoLabel: 'Video',
     untreatable: 'not supported',
     summarize: 'Summarize',
     summarizeSelection: (count) => `Summarize selection (${count})`,
+  },
+  transcription: {
+    fetchingMedia: 'Fetching the media stream…',
+    extractingAudio: 'Extracting the audio track…',
+    assembling: (index, total) => `Assembling segments (${index}/${total})…`,
+    transcribing: (index, total, clock) => `Transcribing ${index}/${total} (${clock})…`,
   },
   processing: {
     back: '← Back',

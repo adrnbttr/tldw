@@ -9,6 +9,8 @@ import { pickBestCandidate, resolveSegmentUrls } from '@/transcription/media';
 import { FfmpegAudio, AUDIO_BYTES_PER_SECOND } from '@/transcription/audio';
 import { planChunks, mergeChunkTranscripts } from '@/transcription/chunker';
 import { transcribeAudio } from '@/transcription/whisper';
+import { getCatalog, isLocale } from '@/i18n';
+import type { Messages } from '@/i18n';
 
 /**
  * Offscreen document (F5).
@@ -34,13 +36,14 @@ function report(msg: OffscreenResponse): void {
 }
 
 async function runJob(job: TranscribeJob): Promise<void> {
+  const t = getCatalog(isLocale(job.uiLanguage) ? job.uiLanguage : 'en').transcription;
   const progress = (detail: string) =>
     report({ type: 'OFFSCREEN_PROGRESS', videoId: job.videoId, detail });
 
   try {
-    const mediaBytes = await downloadSource(job, progress);
+    const mediaBytes = await downloadSource(job, t, progress);
 
-    progress('Extraction de la piste audio…');
+    progress(t.extractingAudio);
     const mp3 = await audio.toMonoMp3(mediaBytes, 'input.media');
 
     const duration = job.duration ?? estimateDuration(mp3.byteLength);
@@ -54,7 +57,7 @@ async function runJob(job: TranscribeJob): Promise<void> {
     let language = job.language;
 
     for (const chunk of chunks) {
-      progress(`Transcription ${chunk.index + 1}/${chunks.length} (${formatClock(chunk.start)})…`);
+      progress(t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)));
       const slice = chunks.length === 1 ? mp3 : await audio.slice(mp3, chunk.start, chunk.end);
       const result = await transcribeAudio(
         new Blob([slice as BlobPart]),
@@ -90,6 +93,7 @@ async function runJob(job: TranscribeJob): Promise<void> {
 /** Resolves and downloads the best media source into a single byte buffer. */
 async function downloadSource(
   job: TranscribeJob,
+  t: Messages['transcription'],
   progress: (detail: string) => void,
 ): Promise<Uint8Array> {
   const best = pickBestCandidate(job.sources);
@@ -97,7 +101,7 @@ async function downloadSource(
     throw new TldwError('MEDIA_NOT_CAPTURABLE', 'No media source was captured.');
   }
 
-  progress('Récupération du flux média…');
+  progress(t.fetchingMedia);
 
   if (best.kind === 'progressive' || best.kind === 'segment') {
     return fetchBytes(best.url);
@@ -111,7 +115,7 @@ async function downloadSource(
     }
     const parts: Uint8Array[] = [];
     for (let i = 0; i < segmentUrls.length; i++) {
-      progress(`Assemblage des segments (${i + 1}/${segmentUrls.length})…`);
+      progress(t.assembling(i + 1, segmentUrls.length));
       parts.push(await fetchBytes(segmentUrls[i]));
     }
     return concat(parts);

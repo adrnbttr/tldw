@@ -12,13 +12,6 @@ interface Props {
   onOpenHistory: () => void;
 }
 
-const PROVIDER_LABEL: Record<DetectedVideo['provider'], string> = {
-  youtube: 'YouTube',
-  vimeo: 'Vimeo',
-  native: 'Vidéo',
-  unknown: 'Inconnu',
-};
-
 const treatable = (v: DetectedVideo) => v.provider !== 'unknown';
 
 export function VideoList({ videos, onSummarize, onBatch, onOpenSettings, onOpenHistory }: Props) {
@@ -45,6 +38,12 @@ export function VideoList({ videos, onSummarize, onBatch, onOpenSettings, onOpen
   };
 
   const selectableCount = videos.filter(treatable).length;
+
+  const providerLabel = (p: DetectedVideo['provider']): string => {
+    if (p === 'youtube') return 'YouTube';
+    if (p === 'vimeo') return 'Vimeo';
+    return t.list.videoLabel;
+  };
 
   return (
     <div class="screen">
@@ -78,7 +77,7 @@ export function VideoList({ videos, onSummarize, onBatch, onOpenSettings, onOpen
                     />
                   )}
                   <span class={`badge badge-${video.provider}`}>
-                    {PROVIDER_LABEL[video.provider]}
+                    {providerLabel(video.provider)}
                   </span>
                   <span class="video-title">{video.title ?? t.list.noTitle}</span>
                 </div>

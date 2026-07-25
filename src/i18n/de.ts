@@ -7,9 +7,16 @@ export const de: Messages = {
     emptyTitle: 'Kein Video auf dieser Seite gefunden.',
     emptyHint: 'Starte die Wiedergabe und öffne dieses Menü erneut.',
     noTitle: 'Video ohne Titel',
+    videoLabel: 'Video',
     untreatable: 'nicht unterstützt',
     summarize: 'Zusammenfassen',
     summarizeSelection: (count) => `Auswahl zusammenfassen (${count})`,
+  },
+  transcription: {
+    fetchingMedia: 'Medienstream wird abgerufen…',
+    extractingAudio: 'Audiospur wird extrahiert…',
+    assembling: (index, total) => `Segmente werden zusammengefügt (${index}/${total})…`,
+    transcribing: (index, total, clock) => `Transkription ${index}/${total} (${clock})…`,
   },
   processing: {
     back: '← Zurück',

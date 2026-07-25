@@ -27,9 +27,17 @@ export interface Messages {
     emptyTitle: string;
     emptyHint: string;
     noTitle: string;
+    /** Badge label for a plain native <video> (YouTube/Vimeo keep their names). */
+    videoLabel: string;
     untreatable: string;
     summarize: string;
     summarizeSelection: (count: number) => string;
+  };
+  transcription: {
+    fetchingMedia: string;
+    extractingAudio: string;
+    assembling: (index: number, total: number) => string;
+    transcribing: (index: number, total: number, clock: string) => string;
   };
   processing: {
     back: string;

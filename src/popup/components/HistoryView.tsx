@@ -9,12 +9,6 @@ interface Props {
   onClose: () => void;
 }
 
-const PROVIDER_LABEL: Record<string, string> = {
-  youtube: 'YouTube',
-  vimeo: 'Vimeo',
-  native: 'Video',
-};
-
 /** History browser (F9) — reopen a past summary without reprocessing the video. */
 export function HistoryView({ onOpen, onClose }: Props) {
   const t = useI18n();
@@ -46,7 +40,11 @@ export function HistoryView({ onOpen, onClose }: Props) {
               <button class="history-row" onClick={() => onOpen(s)}>
                 <div class="video-meta">
                   <span class={`badge badge-${s.provider}`}>
-                    {PROVIDER_LABEL[s.provider] ?? s.provider}
+                    {s.provider === 'youtube'
+                      ? 'YouTube'
+                      : s.provider === 'vimeo'
+                        ? 'Vimeo'
+                        : t.list.videoLabel}
                   </span>
                   <span class="video-title">{s.title}</span>
                 </div>
