@@ -22,20 +22,24 @@ embedded in an authenticated page.
 - [x] Vimeo detection & `text_tracks` retrieval (F4)
 - [x] Clean fallthrough to a typed error when no track exists
 
-## Phase 3 — Audio transcription fallback
+## Phase 3 — Audio transcription fallback 🧪 (implemented, pending real-stream validation)
 
-The most delicate part, isolated behind the `Transcriber` interface.
+The most delicate part, isolated behind the `Transcriber` interface and run in an
+offscreen document (the service worker has no DOM).
 
-- [ ] Media segment capture via `chrome.webRequest` (F5.1)
-- [ ] Segment download in the authenticated context (F5.2)
-- [ ] Audio isolation with `ffmpeg.wasm` (F5.3)
-- [ ] Chunking with overlap under the 25 MB Whisper limit (F5.4)
-- [ ] Sequential transcription + reassembly/de-duplication (F5.5)
-- [ ] Guaranteed temp-file cleanup, incl. on error
-- [ ] Configurable global timeout (default 15 min)
+- [x] Media segment capture via `chrome.webRequest` (F5.1)
+- [x] Segment/stream download in the authenticated context (F5.2)
+- [x] Audio isolation with `ffmpeg.wasm`, single-threaded core (F5.3)
+- [x] Chunking with overlap under the 25 MB Whisper limit (F5.4)
+- [x] Sequential transcription + reassembly/de-duplication (F5.5)
+- [x] Temp-file cleanup, incl. on error
+- [x] Configurable global timeout (default 15 min)
+- [ ] **End-to-end validation against a real DRM-free stream** — the pipeline is
+      wired and unit-tested, but ffmpeg.wasm under the extension CSP and live media
+      extraction still need to be confirmed on a real target.
 
-**Validation:** a Vimeo video without captions yields a summary using the *same*
-template.
+**Validation target:** a Vimeo video without captions yields a summary using the
+*same* template.
 
 ## Phase 4 — Polish
 

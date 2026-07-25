@@ -1,5 +1,8 @@
 import type { Broadcast, ContentMessage, JobProgress, JobState, Request, Response } from '@/types';
 import { runJob, getJobState, cancelJob } from './orchestrator';
+import { installMediaCapture } from './media-capture';
+
+installMediaCapture();
 
 /**
  * Service worker entry point (spec §2.2).

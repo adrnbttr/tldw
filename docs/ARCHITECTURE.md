@@ -28,10 +28,11 @@ Level 3 — Explicit typed error
 | Component | Role | Runs in |
 |---|---|---|
 | `content/` | Detect videos in the DOM (F1) | Page |
-| `background/` | Orchestration, messaging, job state | Service worker |
+| `background/` | Orchestration, messaging, job state, media capture | Service worker |
 | `popup/` | UI: list · processing · result · settings (F2) | Extension |
 | `adapters/` | Per-provider caption extraction (F3, F4) | Background |
-| `transcription/` | Audio fallback, isolated behind a stable interface (F5) | Background |
+| `transcription/` | Audio fallback, isolated behind a stable interface (F5) | Background + offscreen |
+| `offscreen/` | Runs ffmpeg.wasm + Whisper off the worker (has a DOM) | Offscreen document |
 | `summarizer/` | OpenRouter call + versioned template → Markdown (F7) | Background |
 | `storage/` | API keys, preferences, history (F9) | Extension |
 | `types/` | The shared contracts: `Transcript`, `DetectedVideo`, errors, messages | — |
@@ -46,7 +47,16 @@ Level 3 — Explicit typed error
   identical.
 - **The audio fallback is strictly isolated** behind the `Transcriber` interface
   (`src/transcription/index.ts`) — the most fragile part of the project can be
-  swapped without touching anything else.
+  swapped without touching anything else. Its pipeline runs in an **offscreen
+  document** because the MV3 service worker has no DOM:
+  ```
+  resolve source → download → ffmpeg.wasm (mono 16 kHz MP3)
+    → chunk with overlap → Whisper per chunk → merge & de-duplicate → Transcript
+  ```
+  Media sources come from the Vimeo player `config` (progressive/HLS) and from
+  URLs observed by `chrome.webRequest` (`background/media-capture.ts`). The
+  single-threaded ffmpeg core is used on purpose — no `SharedArrayBuffer`, so no
+  COOP/COEP headers are required; the extension CSP only needs `wasm-unsafe-eval`.
 - **Jobs live in the service worker.** The popup subscribes to broadcasts and
   restores state on reopen, so processing survives the popup closing (F2).
 - **No silent failure.** Every error carries a typed code mapped to a clear,

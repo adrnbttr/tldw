@@ -46,7 +46,11 @@ export default defineManifest({
       all_frames: false,
     },
   ],
-  permissions: ['storage', 'activeTab', 'scripting', 'downloads', 'webRequest'],
+  permissions: ['storage', 'activeTab', 'scripting', 'downloads', 'webRequest', 'offscreen'],
   host_permissions: ['<all_urls>'],
-  minimum_chrome_version: '110',
+  // ffmpeg.wasm needs wasm-unsafe-eval; the single-threaded core avoids COOP/COEP.
+  content_security_policy: {
+    extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+  },
+  minimum_chrome_version: '116',
 });

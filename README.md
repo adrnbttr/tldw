@@ -52,7 +52,7 @@ Because two summaries from two different extraction paths must read the same, th
 
 - 🎯 **Smart detection** — embedded YouTube &amp; Vimeo players, native `<video>`, and dynamically injected ones via a `MutationObserver`.
 - 🔐 **Works behind authentication** — extraction runs in the tab's own session context.
-- 🪜 **Best-effort cascade** — captions first, audio transcription as a fallback *(Phase 3)*, then an explicit typed error. Never a silent failure.
+- 🪜 **Best-effort cascade** — captions first, audio transcription as a fallback (`ffmpeg.wasm` + Whisper), then an explicit typed error. Never a silent failure.
 - 📐 **Identical output every time** — structured JSON → local Markdown rendering from a versioned template.
 - 🧠 **Bring your own model** — Claude Sonnet (recommended) or Gemini Flash via OpenRouter, with a hierarchical strategy for very long transcripts.
 - 💾 **Export &amp; history** — one-click `.md` download, clipboard copy, and a local summary cache.
@@ -70,7 +70,7 @@ The extension tries to obtain the video's text in successive levels, dropping on
                   │ NO_CAPTIONS_AVAILABLE
                   ▼
   ┌──────────────────────────────────────────────────────────────┐
-  │  Level 2 — Audio transcription                     [Phase 3]   │
+  │  Level 2 — Audio transcription                                 │
   │    capture media → isolate audio (ffmpeg.wasm) → Whisper       │
   └───────────────┬──────────────────────────────────────────────┘
                   │ fail
@@ -131,6 +131,7 @@ Keys are stored locally and never leave your browser except toward the provider 
 | Language | TypeScript (strict) |
 | UI | Preact |
 | Build | Vite + `@crxjs/vite-plugin` |
+| Audio | `ffmpeg.wasm` (single-threaded core) in an offscreen document |
 | Tests | Vitest |
 | Quality | ESLint + Prettier, GitHub Actions CI |
 | APIs | OpenRouter (summaries) · Whisper (audio fallback) |
@@ -143,7 +144,8 @@ src/
 ├── content/        DOM detection (pure helpers in detect.ts)
 ├── popup/          Preact UI + components (list · processing · result · settings)
 ├── adapters/       youtube.ts · vimeo.ts · registry
-├── transcription/  audio-fallback interface, isolated (Phase 3)
+├── transcription/  audio-fallback: media · chunker · whisper · ffmpeg (isolated)
+├── offscreen/      offscreen document that runs the audio pipeline
 ├── summarizer/     openrouter.ts · versioned template · hierarchical summary
 ├── storage/        chrome.storage wrappers
 ├── shared/         format & markdown helpers
@@ -166,7 +168,7 @@ Contributions are welcome — see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 - [x] **Phase 1** — detection, YouTube adapter, OpenRouter summary, popup, export
 - [x] **Phase 2** — Vimeo adapter (level 1: `text_tracks`)
-- [ ] **Phase 3** — audio transcription fallback (`ffmpeg.wasm` + Whisper)
+- [x] **Phase 3** 🧪 — audio transcription fallback (`ffmpeg.wasm` + Whisper, in an offscreen document) — *implemented, pending validation on a real stream*
 - [ ] **Phase 4** — batch processing, history browser, multiple templates, quota handling
 
 Detailed roadmap in [`docs/ROADMAP.md`](./docs/ROADMAP.md).

@@ -15,6 +15,13 @@ export default defineConfig({
   build: {
     target: 'esnext',
     sourcemap: true,
+    rollupOptions: {
+      // Extra HTML entry that isn't referenced by the manifest (created at
+      // runtime via chrome.offscreen.createDocument).
+      input: {
+        offscreen: fileURLToPath(new URL('./src/offscreen/offscreen.html', import.meta.url)),
+      },
+    },
   },
   server: {
     port: 5173,

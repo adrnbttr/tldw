@@ -19,6 +19,9 @@ dist/
 !.vscode/extensions.json
 *.log
 
+# Vendored ffmpeg.wasm core — regenerated from node_modules at build time
+public/ffmpeg/
+
 # Local-only tooling & scratch
 .tmp/
 *.local

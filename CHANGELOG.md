@@ -14,7 +14,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   settings and history storage.
 - **Phase 2 — Vimeo level 1.** Vimeo detection and `text_tracks` retrieval with a
   clean fallthrough to a typed error when no track exists.
+- **Phase 3 — audio transcription fallback.** Media capture via `chrome.webRequest`,
+  Vimeo progressive/HLS source resolution, audio isolation with `ffmpeg.wasm`
+  (single-threaded core) in an offscreen document, chunking with overlap under the
+  Whisper size limit, sequential transcription with reassembly and overlap
+  de-duplication, temp-file cleanup, and a configurable global timeout. End-to-end
+  extraction is pending validation against a real DRM-free stream.
 - Normalized `Transcript` contract shared across all extraction paths.
-- Isolated `Transcriber` interface for the upcoming audio fallback (Phase 3).
+- Isolated `Transcriber` interface for the audio fallback.
 
 [Unreleased]: https://github.com/adrnbttr/tldw/commits/main
