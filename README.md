@@ -26,7 +26,7 @@ Runs entirely in your browser, with your own API keys. No backend. No subscripti
 - [Preview](#preview)
 - [Features](#features)
 - [How it works](#how-it-works)
-- [Quick start](#quick-start)
+- [Install](#install)
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Tech stack](#tech-stack)
@@ -85,39 +85,64 @@ The extension tries to obtain the video's text in successive levels, dropping on
 
 Full details in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
-## Quick start
+## Install
 
-> **No account, no Web Store, no fee.** tldw installs as an unpacked extension in
-> Developer mode. It's built for personal use — publishing to the Chrome Web Store
-> isn't planned for now (the packaging groundwork lives in [`store/`](./store/) in
-> case that changes).
+tldw runs as an **unpacked extension in Developer mode — no account, no Chrome Web
+Store, no fee.** It's built for personal use; publishing to the Web Store isn't
+planned (the groundwork lives in [`store/`](./store/) if that ever changes).
 
-Requires **Node ≥ 18**.
+**Prerequisites:** [Node](https://nodejs.org) ≥ 18 (ships with npm) and a Chromium
+browser — Chrome or Edge.
+
+### 1 · Build it
 
 ```bash
 git clone https://github.com/adrnbttr/tldw.git
 cd tldw
 npm install
-npm run build        # bundles the extension into dist/
+npm run build          # → dist/
 ```
 
-Load it in Chrome:
+### 2 · Load it in the browser
 
-1. Open `chrome://extensions`
-2. Enable **Developer mode** (top-right)
-3. **Load unpacked** → select the `dist/` folder
+1. Open `chrome://extensions` (or `edge://extensions`)
+2. Toggle **Developer mode** (top-right)
+3. Click **Load unpacked** and select the `dist/` folder
+4. Pin tldw to the toolbar (optional, but handy)
 
-For live development with hot-reload, run `npm run dev` instead.
+### 3 · Add your API key — required before the first summary
 
-### Using it on another computer
+Open the tldw popup → **⚙️ Settings** → paste your
+[OpenRouter key](https://openrouter.ai/keys) → **Save**. Without it, summarizing
+stops with *“Clé OpenRouter manquante.”* The transcription key is optional (only
+used by the audio fallback). Keys are stored locally — see [Configuration](#configuration).
 
-Same thing — no account required. Either:
+### Updating
 
-- copy the built `dist/` folder over and **Load unpacked** it, or
-- clone the repo there and run `npm install && npm run build`.
+Unpacked extensions don't auto-update. After pulling changes:
 
-Unpacked extensions don't auto-update, so to get changes just `git pull` and
-rebuild (or recopy `dist/`).
+```bash
+git pull
+npm install            # only if dependencies changed
+npm run build
+```
+
+Then open `chrome://extensions` and click the **↻ reload** icon on the tldw card —
+otherwise the browser keeps the old build.
+
+### On another computer
+
+Same deal, no account: copy the built `dist/` folder over and **Load unpacked** it,
+or clone the repo there and run `npm install && npm run build`.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| “Aucune vidéo trouvée” | Start playback, then reopen the popup — detection runs on the live page. |
+| “Clé OpenRouter manquante” | Add your key in **⚙️ Settings** (step 3). |
+| Changes not showing after a rebuild | Click **↻ reload** on the extension card in `chrome://extensions`. |
+| Iterating on the code | Run `npm run dev` and load the `dist/` it writes — it hot-reloads on save. |
 
 ## Configuration
 
