@@ -153,6 +153,22 @@ typed error:
 
 ---
 
+## 4b · Languages & native video
+
+**Interface language**
+- Settings → **Interface language** → pick Español/Deutsch → the popup updates
+  instantly (no reload). Reopen the popup → the choice persists.
+
+**Summary language**
+- Settings → **Summary language** → German → summarize → the summary content *and*
+  the section headings (`## Kurz gesagt`, …) come out in German.
+
+**Native `<video>` (any site)**
+- Open a page with a plain HTML5 `<video>` on a non-YouTube/Vimeo site (DRM-free),
+  with a transcription key set.
+- **Expect** it to be listed and summarizable: no caption step, straight to the
+  audio fallback via the captured/native media URL.
+
 ## 5 · Acceptance criteria (spec §6)
 
 - [ ] Detects YouTube and Vimeo videos embedded in an authenticated page

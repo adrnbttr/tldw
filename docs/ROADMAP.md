@@ -49,6 +49,20 @@ offscreen document (the service worker has no DOM).
 - [x] Multiple templates — `default` and `compact`, selectable in Settings (F7)
 - [x] Fine-grained quota handling — 429/402 + `Retry-After` surfaced to the user
 
+## Beyond the spec
+
+Shipped on top of the original functional spec:
+
+- [x] **Internationalization** — English, Français, Español, Deutsch, for both the UI
+      and the summary output (headings included)
+- [x] **Any native `<video>`** — sites beyond YouTube/Vimeo are summarized through the
+      audio fallback when the media is DRM-free
+- [x] **State restore on reopen** — a running job or batch is restored when the popup
+      is closed and reopened
+- [ ] More caption adapters (Dailymotion, Wistia, …) — the `Adapter` interface makes
+      these additive
+- [ ] Real-extension screenshots in the README (see [`SCREENSHOTS.md`](./SCREENSHOTS.md))
+
 ## Open questions
 
 Tracked in the [spec](./SPEC.md) §7: transcription provider (Whisper vs Deepgram),

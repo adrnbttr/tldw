@@ -50,7 +50,9 @@ Because two summaries from two different extraction paths must read the same, th
 
 ## Features
 
-- 🎯 **Smart detection** — embedded YouTube &amp; Vimeo players, native `<video>`, and dynamically injected ones via a `MutationObserver`.
+- 🎯 **Smart detection** — embedded YouTube &amp; Vimeo players, plus any native `<video>` on any site, kept up to date via a `MutationObserver`.
+- 🌍 **Any DRM-free video** — YouTube/Vimeo captions when available, and for everything else (native `<video>` on course platforms, etc.) an audio-transcription fallback. Not just the big two hosts.
+- 🌐 **Multilingual UI** — English, Français, Español, Deutsch; pick the interface *and* the summary language independently.
 - 🔐 **Works behind authentication** — extraction runs in the tab's own session context.
 - 🪜 **Best-effort cascade** — captions first, audio transcription as a fallback (`ffmpeg.wasm` + Whisper), then an explicit typed error. Never a silent failure.
 - 📐 **Identical output every time** — structured JSON → local Markdown rendering from a versioned template.
@@ -161,7 +163,8 @@ Open the popup → **⚙️ Settings**:
 | **OpenRouter API key** | Summary generation. Grab one at [openrouter.ai/keys](https://openrouter.ai/keys). |
 | **Transcription API key** | Audio fallback only (Phase 3). |
 | **Summary model** | `Claude Sonnet` (recommended for format fidelity) or `Gemini Flash` for very long transcripts. |
-| **Output language / detail level** | Tune tone and length. |
+| **Interface language** | English · Français · Español · Deutsch (applies instantly). |
+| **Summary language / detail level** | Language of the generated summary, and how concise it is. |
 
 Keys are stored locally and never leave your browser except toward the provider they target. See [`docs/PRIVACY.md`](./docs/PRIVACY.md).
 

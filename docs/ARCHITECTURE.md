@@ -10,12 +10,16 @@ rung on each failure. **Every level produces the same normalized `Transcript`
 object**, so the summarizer never knows — or cares — where the text came from.
 This is what guarantees an identical output formalism whatever path is taken.
 
+A provider with a caption adapter (YouTube, Vimeo) tries level 1 first; a plain
+native `<video>` on any other site has no caption adapter and drops straight to
+level 2.
+
 ```
 Level 1 — Caption track
   ├── YouTube : manual or automatic captions
   └── Vimeo   : text_tracks if present
-        └── fail (NO_CAPTIONS_AVAILABLE) ↓
-Level 2 — Audio extraction + transcription     [Phase 3]
+        └── fail (NO_CAPTIONS_AVAILABLE) or no adapter ↓
+Level 2 — Audio extraction + transcription
   ├── capture media segments (chrome.webRequest)
   ├── isolate the audio track (ffmpeg.wasm)
   └── transcribe (Whisper), reassemble
@@ -35,6 +39,7 @@ Level 3 — Explicit typed error
 | `offscreen/` | Runs ffmpeg.wasm + Whisper off the worker (has a DOM) | Offscreen document |
 | `summarizer/` | OpenRouter call + versioned template → Markdown (F7) | Background |
 | `storage/` | API keys, preferences, history (F9) | Extension |
+| `i18n/` | Typed message catalogs (en/fr/es/de); UI + errors + template headings | Popup + shared |
 | `types/` | The shared contracts: `Transcript`, `DetectedVideo`, errors, messages | — |
 
 ## Key design decisions
@@ -59,8 +64,12 @@ Level 3 — Explicit typed error
   COOP/COEP headers are required; the extension CSP only needs `wasm-unsafe-eval`.
 - **Jobs live in the service worker.** The popup subscribes to broadcasts and
   restores state on reopen, so processing survives the popup closing (F2).
-- **No silent failure.** Every error carries a typed code mapped to a clear,
-  actionable user message (`src/types/errors.ts`).
+- **No silent failure.** Every error carries a typed code; the popup maps that code
+  to a localized, actionable message (`src/i18n`), with an English fallback in
+  `src/types/errors.ts`.
+- **Localization is type-safe.** Every locale implements the `Messages` interface,
+  so a missing or misspelled key fails the build; a runtime test also asserts key
+  parity. UI language and summary-output language are chosen independently.
 
 ## Message flow
 

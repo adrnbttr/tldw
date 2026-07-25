@@ -8,6 +8,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Internationalization (en/fr/es/de).** Fully localized popup, typed error
+  messages, step labels, and summary template headings. Interface language and
+  summary-output language are chosen independently; the first run defaults to the
+  browser's UI language. Locale key parity is enforced at compile time and by a test.
+- **Support for any native `<video>`.** Sites beyond YouTube/Vimeo are summarized via
+  the audio fallback when the media is DRM-free; the content script captures the
+  native media URL and the orchestrator skips straight to transcription.
+- Repo hygiene: `SECURITY.md`, `CODE_OF_CONDUCT.md`, `.editorconfig`, Dependabot,
+  `docs/SCREENSHOTS.md`, and a one-command `install.sh`.
+
+### Fixed
+
+- The popup now restores a running job or batch after being closed and reopened
+  (jobs were keyed by an ephemeral detection id).
+
 - **Phase 1 — Core & nominal path.** Video detection (`MutationObserver`), YouTube
   caption adapter, OpenRouter summary generation with a versioned template, Preact
   popup (list / processing / result / settings), Markdown export and clipboard copy,
