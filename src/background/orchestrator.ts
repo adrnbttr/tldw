@@ -24,7 +24,9 @@ import { getSettings, saveSummary, findCachedSummary } from '@/storage';
  */
 
 const jobs = new Map<string, JobState>();
+const jobVideos = new Map<string, DetectedVideo>();
 const controllers = new Map<string, AbortController>();
+let lastJobId: string | null = null;
 
 type Broadcaster = (state: JobState, progress?: JobProgress) => void;
 
@@ -40,6 +42,18 @@ function initialSteps(videoId: string): JobProgress[] {
 
 export function getJobState(videoId: string): JobState {
   return jobs.get(videoId) ?? { phase: 'idle' };
+}
+
+/**
+ * The most recent job together with its video, so the popup can restore the
+ * processing view after being closed and reopened — even though a re-scan of the
+ * page assigns fresh local ids (F2, "state restored on reopen").
+ */
+export function getActiveJob(): { video: DetectedVideo; state: JobState } | null {
+  if (!lastJobId) return null;
+  const video = jobVideos.get(lastJobId);
+  const state = jobs.get(lastJobId);
+  return video && state ? { video, state } : null;
 }
 
 let batchState: BatchState = { phase: 'idle' };
@@ -102,6 +116,8 @@ export function cancelJob(videoId: string): void {
 export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Promise<void> {
   const controller = new AbortController();
   controllers.set(video.id, controller);
+  jobVideos.set(video.id, video);
+  lastJobId = video.id;
   const { signal } = controller;
 
   const steps = initialSteps(video.id);
@@ -163,21 +179,23 @@ async function extract(
   setStep: (step: JobStep, status: JobStepStatus, detail?: string) => void,
 ) {
   const adapter = selectAdapter(video);
-  if (!adapter) {
-    throw new TldwError('UNSUPPORTED_PROVIDER', `No adapter for provider ${video.provider}.`);
-  }
 
-  // Level 1 — captions.
-  setStep('captions', 'active');
-  try {
-    const transcript = await adapter.extractCaptions(video, signal);
-    setStep('captions', 'done');
-    setStep('audio_capture', 'skipped');
-    setStep('transcription', 'skipped');
-    return transcript;
-  } catch (err) {
-    if (!(err instanceof TldwError) || err.code !== 'NO_CAPTIONS_AVAILABLE') throw err;
-    setStep('captions', 'failed');
+  // Level 1 — captions (only when a provider adapter exists).
+  if (adapter) {
+    setStep('captions', 'active');
+    try {
+      const transcript = await adapter.extractCaptions(video, signal);
+      setStep('captions', 'done');
+      setStep('audio_capture', 'skipped');
+      setStep('transcription', 'skipped');
+      return transcript;
+    } catch (err) {
+      if (!(err instanceof TldwError) || err.code !== 'NO_CAPTIONS_AVAILABLE') throw err;
+      setStep('captions', 'failed');
+    }
+  } else {
+    // Native <video> / no caption source: skip straight to the audio fallback.
+    setStep('captions', 'skipped');
   }
 
   // Level 2 — audio fallback.

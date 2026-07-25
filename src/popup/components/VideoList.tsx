@@ -18,7 +18,7 @@ const PROVIDER_LABEL: Record<DetectedVideo['provider'], string> = {
   unknown: 'Inconnu',
 };
 
-const treatable = (v: DetectedVideo) => v.provider === 'youtube' || v.provider === 'vimeo';
+const treatable = (v: DetectedVideo) => v.provider !== 'unknown';
 
 export function VideoList({ videos, onSummarize, onBatch, onOpenSettings, onOpenHistory }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());

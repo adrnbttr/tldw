@@ -9,6 +9,16 @@ import { dedupe, externalIdFromUrl, makeDetected, providerFromUrl } from './dete
  * only their `src` is read to derive the provider and external id (spec §3.1).
  */
 
+/** Direct http(s) media URL of a native video, or null for MSE/blob streams. */
+function nativeMediaSrc(video: HTMLVideoElement): string | null {
+  const candidate =
+    video.currentSrc ||
+    video.src ||
+    (video.querySelector('source[src]') as HTMLSourceElement | null)?.src ||
+    '';
+  return candidate.startsWith('http') ? candidate : null;
+}
+
 function scan(): DetectedVideo[] {
   const found: DetectedVideo[] = [];
 
@@ -20,6 +30,7 @@ function scan(): DetectedVideo[] {
         provider: 'native',
         title: document.title || null,
         duration: Number.isFinite(video.duration) ? video.duration : null,
+        mediaSrc: nativeMediaSrc(video),
         isPlaying: !video.paused,
       }),
     );

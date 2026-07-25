@@ -2,6 +2,7 @@ import type { DetectedVideo, Settings, Transcript, TranscriptSegment } from '@/t
 import { TldwError, buildFullText } from '@/types';
 import { getCapturedMedia } from '@/background/media-capture';
 import type { MediaCandidate } from './media';
+import { classifyMedia } from './media';
 import type { OffscreenRequest, OffscreenResponse, TranscribeJob } from './offscreen-protocol';
 import { OFFSCREEN_PATH } from './offscreen-protocol';
 
@@ -65,6 +66,11 @@ export const audioTranscriber: Transcriber = {
 /** Collects candidate media sources: Vimeo progressive/HLS + captured requests. */
 async function resolveSources(video: DetectedVideo): Promise<MediaCandidate[]> {
   const sources: MediaCandidate[] = [];
+
+  // A native <video>'s own direct URL is the most reliable source.
+  if (video.mediaSrc) {
+    sources.push({ url: video.mediaSrc, kind: classifyMedia(video.mediaSrc) });
+  }
 
   if (video.provider === 'vimeo' && video.externalId) {
     sources.push(...(await vimeoSources(video.externalId)));

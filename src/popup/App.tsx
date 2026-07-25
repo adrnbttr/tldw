@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { Broadcast, BatchState, DetectedVideo, JobState, Summary } from '@/types';
-import { listVideos, requestBatch, getBatchState } from './messaging';
+import { listVideos, requestBatch, getBatchState, getActiveJob } from './messaging';
 import { VideoList } from './components/VideoList';
 import { ProcessingView } from './components/ProcessingView';
 import { ResultView } from './components/ResultView';
@@ -27,6 +27,21 @@ export function App() {
 
   useEffect(() => {
     void listVideos().then(setVideos);
+
+    // Restore in-flight work after the popup was closed and reopened (F2).
+    void (async () => {
+      const batch = await getBatchState();
+      if (batch.phase === 'running') {
+        setBatchState(batch);
+        setScreen('batch');
+        return;
+      }
+      const job = await getActiveJob();
+      if (job && job.state.phase === 'running') {
+        setActive(job.video);
+        setJobState(job.state);
+      }
+    })();
 
     const onMessage = (msg: Broadcast) => {
       if (msg.type === 'JOB_STATE') setJobState(msg.state);

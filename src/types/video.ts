@@ -18,5 +18,11 @@ export interface DetectedVideo {
   duration: number | null;
   /** Full iframe/player URL, when the video is embedded. */
   iframeSrc: string | null;
+  /**
+   * Direct media URL for a native `<video>` (from `currentSrc`/`<source>`), when
+   * it is a plain http(s) file. Used as a first candidate for the audio fallback.
+   * `null` for MSE/blob streams — those are found via network capture instead.
+   */
+  mediaSrc: string | null;
   isPlaying: boolean;
 }

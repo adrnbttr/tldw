@@ -58,6 +58,7 @@ export function makeDetected(
     title: partial.title ?? null,
     duration: partial.duration ?? null,
     iframeSrc: partial.iframeSrc ?? null,
+    mediaSrc: partial.mediaSrc ?? null,
     isPlaying: partial.isPlaying ?? false,
   };
 }

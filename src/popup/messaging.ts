@@ -1,4 +1,4 @@
-import type { BatchState, DetectedVideo, JobState, Request, Response } from '@/types';
+import type { ActiveJob, BatchState, DetectedVideo, JobState, Request, Response } from '@/types';
 
 /** Typed wrappers around chrome.runtime messaging for the popup. */
 
@@ -14,6 +14,11 @@ export async function listVideos(): Promise<DetectedVideo[]> {
 export async function getJobState(videoId: string): Promise<JobState> {
   const res = await send({ type: 'GET_JOB_STATE', videoId });
   return res.ok && 'state' in res ? res.state : { phase: 'idle' };
+}
+
+export async function getActiveJob(): Promise<ActiveJob | null> {
+  const res = await send({ type: 'GET_ACTIVE_JOB' });
+  return res.ok && 'active' in res ? res.active : null;
 }
 
 export async function requestSummary(video: DetectedVideo): Promise<void> {

@@ -35,10 +35,17 @@ export type JobState =
 export type Request =
   | { type: 'LIST_VIDEOS' }
   | { type: 'GET_JOB_STATE'; videoId: string }
+  | { type: 'GET_ACTIVE_JOB' }
   | { type: 'SUMMARIZE'; video: DetectedVideo }
   | { type: 'SUMMARIZE_BATCH'; videos: DetectedVideo[] }
   | { type: 'GET_BATCH_STATE' }
   | { type: 'CANCEL'; videoId: string };
+
+/** The running/most-recent job with its video, for popup restore (F2). */
+export interface ActiveJob {
+  video: DetectedVideo;
+  state: JobState;
+}
 
 /** Outcome of one video within a batch run (F8). */
 export interface BatchItemResult {
@@ -64,6 +71,7 @@ export type Response =
   | { ok: true; videos: DetectedVideo[] }
   | { ok: true; state: JobState }
   | { ok: true; batch: BatchState }
+  | { ok: true; active: ActiveJob | null }
   | { ok: true }
   | { ok: false; code: TldwErrorCode; message: string };
 

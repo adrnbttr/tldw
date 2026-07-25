@@ -1,6 +1,13 @@
 import type { Broadcast, ContentMessage, JobProgress, JobState, Request, Response } from '@/types';
 import type { BatchState } from '@/types';
-import { runJob, runBatch, getJobState, getBatchState, cancelJob } from './orchestrator';
+import {
+  runJob,
+  runBatch,
+  getJobState,
+  getActiveJob,
+  getBatchState,
+  cancelJob,
+} from './orchestrator';
 import { installMediaCapture } from './media-capture';
 
 installMediaCapture();
@@ -50,6 +57,11 @@ chrome.runtime.onMessage.addListener(
 
     if (message.type === 'GET_JOB_STATE') {
       sendResponse({ ok: true, state: getJobState(message.videoId) });
+      return false;
+    }
+
+    if (message.type === 'GET_ACTIVE_JOB') {
+      sendResponse({ ok: true, active: getActiveJob() });
       return false;
     }
 
