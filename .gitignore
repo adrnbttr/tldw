@@ -6,6 +6,7 @@ dist/
 *.crx
 *.pem
 *.zip
+tldw-v*.zip
 
 # Environment & secrets
 .env

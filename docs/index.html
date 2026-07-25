@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>tldw — Privacy Policy</title>
+    <meta
+      name="description"
+      content="Privacy policy for tldw, a browser extension that summarizes embedded videos."
+    />
+    <style>
+      :root {
+        --bg: #ffffff;
+        --fg: #1a1a1a;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --accent: #4f46e5;
+        --card: #f9fafb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1020;
+          --fg: #ededed;
+          --muted: #9ca3af;
+          --border: #2a2a30;
+          --accent: #818cf8;
+          --card: #17171a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        line-height: 1.6;
+        color: var(--fg);
+        background: var(--bg);
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 48px 24px 80px;
+      }
+      header.hero {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 20px;
+        margin-bottom: 28px;
+      }
+      h1 {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 34px;
+        margin: 0;
+        letter-spacing: -1px;
+      }
+      .tag {
+        color: var(--muted);
+        font-size: 15px;
+      }
+      h2 {
+        font-size: 19px;
+        margin-top: 34px;
+      }
+      a {
+        color: var(--accent);
+      }
+      code {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 1px 5px;
+        font-size: 0.9em;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+        font-size: 14px;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--card);
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      footer {
+        margin-top: 48px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="hero">
+        <h1>tldw</h1>
+        <span class="tag">Privacy Policy</span>
+      </header>
+
+      <p>
+        <strong>tldw</strong> is a browser extension that turns embedded YouTube and Vimeo videos
+        into structured Markdown summaries. It runs entirely in your browser with your own API keys.
+        Source code: <a href="https://github.com/adrnbttr/tldw">github.com/adrnbttr/tldw</a>.
+      </p>
+
+      <h2>Short version</h2>
+      <p>
+        There is no backend under our control. We do not collect, store, sell, or transmit your data
+        anywhere. No analytics, no tracking, no third-party telemetry.
+      </p>
+
+      <h2>What is stored, and where</h2>
+      <p>
+        Everything lives in <code>chrome.storage.local</code>, on your machine only: your API keys,
+        your preferences, and a local history of the summaries you generate (a configurable limit,
+        default 50). You can clear it at any time by removing the extension.
+      </p>
+
+      <h2>Where your data goes</h2>
+      <table>
+        <tr>
+          <th>Data</th>
+          <th>Sent to</th>
+          <th>When</th>
+        </tr>
+        <tr>
+          <td>Video transcript text</td>
+          <td>OpenRouter (your API key)</td>
+          <td>When you generate a summary</td>
+        </tr>
+        <tr>
+          <td>Extracted audio</td>
+          <td>Your transcription provider (your API key)</td>
+          <td>Only when the audio fallback runs</td>
+        </tr>
+        <tr>
+          <td>API keys</td>
+          <td>Only the provider they belong to</td>
+          <td>On each request to that provider</td>
+        </tr>
+      </table>
+      <p class="muted">
+        These are your own accounts with those providers; their handling of the data is governed by
+        their respective privacy policies.
+      </p>
+
+      <h2>What tldw never does</h2>
+      <ul>
+        <li>Never transmits your keys to anyone but the matching provider.</li>
+        <li>
+          Never accesses the contents of cross-origin iframes — only the iframe
+          <code>src</code> is read to identify the video.
+        </li>
+        <li>Never attempts to bypass DRM.</li>
+        <li>Never runs analytics or contacts a server we operate.</li>
+      </ul>
+
+      <h2>Your responsibility</h2>
+      <p>
+        Extracting content behind authentication may be governed by a site's terms of use.
+        Confirming that your usage is permitted is your responsibility. tldw is intended for
+        personal use on content you legitimately have access to.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions or requests: open an issue on
+        <a href="https://github.com/adrnbttr/tldw/issues">GitHub</a>.
+      </p>
+
+      <footer>Last updated: 2026-07-25 · tldw is open-source under the MIT license.</footer>
+    </div>
+  </body>
+</html>

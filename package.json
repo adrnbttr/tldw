@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "icons": "node scripts/gen-icons.mjs"
+    "icons": "node scripts/gen-icons.mjs",
+    "package": "node scripts/package.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",
