@@ -211,7 +211,9 @@ npm run lint     # ESLint + Prettier check
 npm run format   # apply Prettier
 ```
 
-Contributions are welcome — see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+To validate the extension in a real browser (phase by phase, with debugging tips),
+follow [`docs/TESTING.md`](./docs/TESTING.md). Contributions are welcome — see
+[`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Roadmap
 

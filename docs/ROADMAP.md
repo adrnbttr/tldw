@@ -36,7 +36,8 @@ offscreen document (the service worker has no DOM).
 - [x] Configurable global timeout (default 15 min)
 - [ ] **End-to-end validation against a real DRM-free stream** — the pipeline is
       wired and unit-tested, but ffmpeg.wasm under the extension CSP and live media
-      extraction still need to be confirmed on a real target.
+      extraction still need to be confirmed on a real target. Follow
+      [`TESTING.md`](./TESTING.md) §3.
 
 **Validation target:** a Vimeo video without captions yields a summary using the
 *same* template.
