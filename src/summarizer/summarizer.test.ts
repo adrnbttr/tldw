@@ -40,6 +40,7 @@ describe('template rendering', () => {
       durationLabel: '30 min 47',
       transcriptSource: 'youtube_captions',
       isoDate: '2026-07-24',
+      locale: 'fr',
       content: {
         tldr: 'En bref.',
         keyPoints: ['Point 1', 'Point 2'],
@@ -51,8 +52,23 @@ describe('template rendering', () => {
     expect(md).toContain('# Titre');
     expect(md).toContain('## En bref');
     expect(md).toContain('## Points clés');
-    expect(md).toContain('**Méthode :** Sous-titres YouTube');
+    expect(md).toContain('**Méthode:** Sous-titres YouTube');
     expect(md).toContain('- **Terme** — Déf.');
+  });
+
+  it('localizes headings by output language', () => {
+    const render = (locale: 'en' | 'de') =>
+      getTemplate('default-v1').render({
+        title: 'T',
+        provider: 'youtube',
+        durationLabel: '5 min',
+        transcriptSource: 'youtube_captions',
+        isoDate: '2026-07-24',
+        locale,
+        content: { tldr: 'x', keyPoints: ['p'], sections: [], glossary: [], takeaways: ['r'] },
+      });
+    expect(render('en')).toContain('## In brief');
+    expect(render('de')).toContain('## Kurz gesagt');
   });
 
   it('exposes at least the default and compact templates', () => {
@@ -68,6 +84,7 @@ describe('template rendering', () => {
       durationLabel: '5 min',
       transcriptSource: 'youtube_captions',
       isoDate: '2026-07-24',
+      locale: 'fr',
       content: {
         tldr: 'Bref.',
         keyPoints: ['P1'],

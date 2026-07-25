@@ -1,4 +1,5 @@
-import type { DetectedVideo, JobState, JobStep, JobStepStatus } from '@/types';
+import type { DetectedVideo, JobState, JobStepStatus } from '@/types';
+import { useI18n } from '@/i18n/context';
 import { cancel } from '../messaging';
 
 interface Props {
@@ -6,14 +7,6 @@ interface Props {
   state: JobState;
   onBack: () => void;
 }
-
-const STEP_LABEL: Record<JobStep, string> = {
-  detect: 'Détection',
-  captions: 'Recherche des sous-titres',
-  audio_capture: 'Capture du flux média',
-  transcription: 'Transcription audio',
-  summarize: 'Génération du résumé',
-};
 
 const STATUS_ICON: Record<JobStepStatus, string> = {
   pending: '○',
@@ -24,23 +17,24 @@ const STATUS_ICON: Record<JobStepStatus, string> = {
 };
 
 export function ProcessingView({ video, state, onBack }: Props) {
+  const t = useI18n();
   const steps = state.phase === 'running' ? state.steps : [];
 
   return (
     <div class="screen">
       <header class="topbar">
         <button class="link" onClick={onBack}>
-          ← Retour
+          {t.processing.back}
         </button>
-        <h1>{video.title ?? 'Traitement'}</h1>
+        <h1>{video.title ?? t.processing.steps.summarize}</h1>
       </header>
 
       {state.phase === 'error' ? (
         <div class="error-box">
-          <p class="error-title">Échec</p>
-          <p>{state.message}</p>
+          <p class="error-title">{t.processing.failedTitle}</p>
+          <p>{t.errors[state.code]}</p>
           <button class="primary" onClick={onBack}>
-            Retour à la liste
+            {t.processing.backToList}
           </button>
         </div>
       ) : (
@@ -49,13 +43,13 @@ export function ProcessingView({ video, state, onBack }: Props) {
             {steps.map((s) => (
               <li key={s.step} class={`step step-${s.status}`}>
                 <span class="step-icon">{STATUS_ICON[s.status]}</span>
-                <span class="step-label">{STEP_LABEL[s.step]}</span>
+                <span class="step-label">{t.processing.steps[s.step]}</span>
                 {s.detail && <span class="step-detail">{s.detail}</span>}
               </li>
             ))}
           </ul>
           <button class="link danger" onClick={() => void cancel(video.id)}>
-            Annuler
+            {t.processing.cancel}
           </button>
         </>
       )}

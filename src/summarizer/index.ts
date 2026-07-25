@@ -17,10 +17,17 @@ import { getTemplate } from './template';
 /** Rough character budget per block before we switch to hierarchical mode. */
 const BLOCK_CHAR_LIMIT = 24_000;
 
+const LANGUAGE_NAMES: Record<Settings['outputLanguage'], string> = {
+  en: 'English',
+  fr: 'French',
+  es: 'Spanish',
+  de: 'German',
+};
+
 const DETAIL_HINT: Record<Settings['detailLevel'], string> = {
-  concise: 'Sois concis : privilégie la densité, va à l’essentiel.',
-  standard: 'Niveau de détail standard.',
-  detailed: 'Sois détaillé : développe chaque section, ne perds aucun point important.',
+  concise: 'Be concise: favor density, get to the essentials.',
+  standard: 'Standard level of detail.',
+  detailed: 'Be thorough: develop each section, do not drop any important point.',
 };
 
 export async function summarize(
@@ -42,17 +49,18 @@ export async function summarize(
     sourceText = await condense(sourceText, settings, signal);
   }
 
+  const languageName = LANGUAGE_NAMES[settings.outputLanguage] ?? 'English';
   const system = [
-    `Tu es un assistant qui résume des vidéos pédagogiques en ${settings.outputLanguage}.`,
+    `You summarize educational videos. Write ALL summary content in ${languageName}.`,
     detailHint,
     template.schemaHint,
   ].join('\n\n');
 
   const user = [
-    `Titre : ${transcript.metadata.title ?? 'Vidéo sans titre'}`,
-    `Langue de la transcription : ${transcript.language}`,
+    `Title: ${transcript.metadata.title ?? 'Untitled video'}`,
+    `Transcript language: ${transcript.language}`,
     '',
-    'Transcription :',
+    'Transcript:',
     sourceText,
   ].join('\n');
 
@@ -69,7 +77,7 @@ export async function summarize(
 
   const content = parseSummaryContent(raw);
 
-  const title = transcript.metadata.title ?? 'Vidéo sans titre';
+  const title = transcript.metadata.title ?? 'Untitled video';
   const durationLabel = formatDuration(transcript.duration);
   const date = isoDate();
 
@@ -79,6 +87,7 @@ export async function summarize(
     durationLabel,
     transcriptSource: transcript.source,
     isoDate: date,
+    locale: settings.outputLanguage,
     content,
   });
 
@@ -107,7 +116,7 @@ async function condense(text: string, settings: Settings, signal?: AbortSignal):
       messages: [
         {
           role: 'system',
-          content: `Résume fidèlement ce passage d'une vidéo en ${settings.outputLanguage}, en conservant tous les points importants. Texte brut, pas de mise en forme.`,
+          content: `Faithfully summarize this passage of a video in ${LANGUAGE_NAMES[settings.outputLanguage] ?? 'English'}, keeping every important point. Plain text, no formatting.`,
         },
         { role: 'user', content: block },
       ],

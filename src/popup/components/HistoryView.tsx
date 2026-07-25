@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import type { Summary } from '@/types';
 import { getHistory } from '@/storage';
 import { isoDate } from '@/shared/format';
+import { useI18n } from '@/i18n/context';
 
 interface Props {
   onOpen: (summary: Summary) => void;
@@ -11,11 +12,12 @@ interface Props {
 const PROVIDER_LABEL: Record<string, string> = {
   youtube: 'YouTube',
   vimeo: 'Vimeo',
-  native: 'Vidéo',
+  native: 'Video',
 };
 
 /** History browser (F9) — reopen a past summary without reprocessing the video. */
 export function HistoryView({ onOpen, onClose }: Props) {
+  const t = useI18n();
   const [summaries, setSummaries] = useState<Summary[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -30,13 +32,13 @@ export function HistoryView({ onOpen, onClose }: Props) {
     <div class="screen">
       <header class="topbar">
         <button class="link" onClick={onClose}>
-          ← Retour
+          {t.history.back}
         </button>
-        <h1>Historique</h1>
+        <h1>{t.history.heading}</h1>
       </header>
 
       {loaded && summaries.length === 0 ? (
-        <p class="empty">Aucun résumé enregistré pour l'instant.</p>
+        <p class="empty">{t.history.empty}</p>
       ) : (
         <ul class="video-list">
           {summaries.map((s) => (

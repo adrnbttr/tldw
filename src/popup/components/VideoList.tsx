@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import type { DetectedVideo } from '@/types';
 import { formatDuration } from '@/shared/format';
+import { useI18n } from '@/i18n/context';
 import { requestSummary } from '../messaging';
 
 interface Props {
@@ -21,6 +22,7 @@ const PROVIDER_LABEL: Record<DetectedVideo['provider'], string> = {
 const treatable = (v: DetectedVideo) => v.provider !== 'unknown';
 
 export function VideoList({ videos, onSummarize, onBatch, onOpenSettings, onOpenHistory }: Props) {
+  const t = useI18n();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const start = (video: DetectedVideo) => {
@@ -48,19 +50,19 @@ export function VideoList({ videos, onSummarize, onBatch, onOpenSettings, onOpen
     <div class="screen">
       <header class="topbar">
         <h1>tldw</h1>
-        <button class="icon-btn" title="Historique" onClick={onOpenHistory}>
+        <button class="icon-btn" title={t.list.historyTooltip} onClick={onOpenHistory}>
           🕘
         </button>
-        <button class="icon-btn" title="Paramètres" onClick={onOpenSettings}>
+        <button class="icon-btn" title={t.list.settingsTooltip} onClick={onOpenSettings}>
           ⚙️
         </button>
       </header>
 
       {videos.length === 0 ? (
         <p class="empty">
-          Aucune vidéo trouvée sur cette page.
+          {t.list.emptyTitle}
           <br />
-          Lancez la lecture puis rouvrez ce menu.
+          {t.list.emptyHint}
         </p>
       ) : (
         <>
@@ -78,14 +80,14 @@ export function VideoList({ videos, onSummarize, onBatch, onOpenSettings, onOpen
                   <span class={`badge badge-${video.provider}`}>
                     {PROVIDER_LABEL[video.provider]}
                   </span>
-                  <span class="video-title">{video.title ?? 'Vidéo sans titre'}</span>
+                  <span class="video-title">{video.title ?? t.list.noTitle}</span>
                 </div>
                 <div class="video-sub">
                   {video.duration != null && <span>{formatDuration(video.duration)}</span>}
-                  {!treatable(video) && <span class="warn">non traitable</span>}
+                  {!treatable(video) && <span class="warn">{t.list.untreatable}</span>}
                 </div>
                 <button class="primary" disabled={!treatable(video)} onClick={() => start(video)}>
-                  Résumer
+                  {t.list.summarize}
                 </button>
               </li>
             ))}
@@ -93,7 +95,7 @@ export function VideoList({ videos, onSummarize, onBatch, onOpenSettings, onOpen
 
           {selected.size > 0 && (
             <button class="primary batch-btn" onClick={runBatch}>
-              Résumer la sélection ({selected.size})
+              {t.list.summarizeSelection(selected.size)}
             </button>
           )}
         </>

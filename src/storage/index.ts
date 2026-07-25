@@ -1,5 +1,6 @@
 import type { Settings, Summary } from '@/types';
 import { DEFAULT_SETTINGS } from '@/types';
+import { detectDefaultLocale } from '@/i18n';
 
 /**
  * chrome.storage.local access layer (F9).
@@ -13,7 +14,12 @@ const HISTORY_KEY = 'history';
 
 export async function getSettings(): Promise<Settings> {
   const stored = await chrome.storage.local.get(SETTINGS_KEY);
-  return { ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] as Partial<Settings> | undefined) };
+  const raw = stored[SETTINGS_KEY] as Partial<Settings> | undefined;
+  const merged = { ...DEFAULT_SETTINGS, ...raw };
+  // First run: default both languages to the browser's UI language.
+  if (!raw?.uiLanguage) merged.uiLanguage = detectDefaultLocale();
+  if (!raw?.outputLanguage) merged.outputLanguage = detectDefaultLocale();
+  return merged;
 }
 
 export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {

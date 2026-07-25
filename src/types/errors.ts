@@ -37,25 +37,27 @@ export class TldwError extends Error {
   }
 }
 
-/** User-facing messages (French UI), mapped from error codes (spec §4). */
+/**
+ * Neutral (English) fallback messages, mapped from error codes (spec §4). The
+ * localized user-facing strings live in the i18n catalogs; these are the internal
+ * default carried on `JobState.message` for logging and non-UI contexts.
+ */
 export const ERROR_MESSAGES: Record<TldwErrorCode, string> = {
-  NO_VIDEO_DETECTED: 'Aucune vidéo trouvée sur cette page. Lancez la lecture puis réessayez.',
+  NO_VIDEO_DETECTED: 'No video found on this page. Start playback, then try again.',
   NO_CAPTIONS_AVAILABLE:
-    "Cette vidéo n'a pas de sous-titres et la transcription audio n'est pas configurée. Ajoutez une clé de transcription dans les paramètres.",
-  MISSING_OPENROUTER_KEY: 'Clé OpenRouter manquante. Renseignez-la dans les paramètres.',
+    'This video has no captions and audio transcription is not configured. Add a transcription key in the settings.',
+  MISSING_OPENROUTER_KEY: 'OpenRouter key missing. Add it in the settings.',
   MISSING_TRANSCRIPTION_KEY:
-    'Clé de transcription manquante. Renseignez-la dans les paramètres pour activer le fallback audio.',
-  QUOTA_EXCEEDED: 'Quota API dépassé.',
-  MEDIA_NOT_CAPTURABLE:
-    "Le flux vidéo n'a pas pu être récupéré. Cet hébergeur n'est peut-être pas supporté.",
-  MEDIA_PROTECTED:
-    'Le contenu est protégé (chiffré). La transcription audio ne peut pas être effectuée.',
-  AUDIO_EXTRACTION_FAILED: "L'isolation de la piste audio a échoué.",
-  TRANSCRIPTION_API_ERROR: 'Le service de transcription a renvoyé une erreur.',
-  TIMEOUT: 'Le traitement a dépassé le délai imparti. Essayez avec une vidéo plus courte.',
-  UNSUPPORTED_PROVIDER: "Cet hébergeur n'est pas encore supporté.",
-  SUMMARY_API_ERROR: 'La génération du résumé a échoué.',
-  UNKNOWN: "Une erreur inattendue s'est produite.",
+    'Transcription key missing. Add it in the settings to enable the audio fallback.',
+  QUOTA_EXCEEDED: 'API quota exceeded.',
+  MEDIA_NOT_CAPTURABLE: 'The video stream could not be retrieved. This host may not be supported.',
+  MEDIA_PROTECTED: 'The content is protected (encrypted). Audio transcription cannot be performed.',
+  AUDIO_EXTRACTION_FAILED: 'Isolating the audio track failed.',
+  TRANSCRIPTION_API_ERROR: 'The transcription service returned an error.',
+  TIMEOUT: 'Processing exceeded the time limit. Try a shorter video.',
+  UNSUPPORTED_PROVIDER: 'This host is not supported yet.',
+  SUMMARY_API_ERROR: 'Generating the summary failed.',
+  UNKNOWN: 'An unexpected error occurred.',
 };
 
 export function messageFor(error: unknown): string {

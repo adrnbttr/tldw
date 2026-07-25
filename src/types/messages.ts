@@ -52,6 +52,8 @@ export interface BatchItemResult {
   videoId: string;
   title: string;
   ok: boolean;
+  /** Error code when `ok` is false, so the UI can localize the message. */
+  code?: TldwErrorCode;
   message?: string;
 }
 

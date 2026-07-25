@@ -3,18 +3,20 @@ import type { DetailLevel, Settings } from '@/types';
 import { AVAILABLE_MODELS, DEFAULT_SETTINGS } from '@/types';
 import { getSettings, saveSettings } from '@/storage';
 import { listTemplates } from '@/summarizer/template';
+import type { Locale } from '@/i18n';
+import { SUPPORTED_LOCALES, LOCALE_LABELS, isLocale } from '@/i18n';
+import { useI18n } from '@/i18n/context';
 
 interface Props {
   onClose: () => void;
+  /** Applies a UI-language change immediately across the popup. */
+  onLocaleChange: (locale: Locale) => void;
 }
 
-const DETAIL_LEVELS: Array<{ value: DetailLevel; label: string }> = [
-  { value: 'concise', label: 'Concis' },
-  { value: 'standard', label: 'Standard' },
-  { value: 'detailed', label: 'Détaillé' },
-];
+const DETAIL_ORDER: DetailLevel[] = ['concise', 'standard', 'detailed'];
 
-export function SettingsView({ onClose }: Props) {
+export function SettingsView({ onClose, onLocaleChange }: Props) {
+  const t = useI18n();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
 
@@ -27,6 +29,12 @@ export function SettingsView({ onClose }: Props) {
     setSaved(false);
   };
 
+  const changeUiLanguage = (value: string) => {
+    if (!isLocale(value)) return;
+    update('uiLanguage', value);
+    onLocaleChange(value); // live preview
+  };
+
   const save = async () => {
     await saveSettings(settings);
     setSaved(true);
@@ -37,13 +45,13 @@ export function SettingsView({ onClose }: Props) {
     <div class="screen">
       <header class="topbar">
         <button class="link" onClick={onClose}>
-          ← Retour
+          {t.settings.back}
         </button>
-        <h1>Paramètres</h1>
+        <h1>{t.settings.heading}</h1>
       </header>
 
       <label class="field">
-        <span>Clé API OpenRouter</span>
+        <span>{t.settings.openRouterKey}</span>
         <input
           type="password"
           value={settings.openRouterKey}
@@ -53,17 +61,17 @@ export function SettingsView({ onClose }: Props) {
       </label>
 
       <label class="field">
-        <span>Clé API transcription (fallback audio)</span>
+        <span>{t.settings.transcriptionKey}</span>
         <input
           type="password"
           value={settings.transcriptionKey}
-          placeholder="optionnelle"
+          placeholder={t.settings.transcriptionPlaceholder}
           onInput={(e) => update('transcriptionKey', (e.target as HTMLInputElement).value)}
         />
       </label>
 
       <label class="field">
-        <span>Modèle de résumé</span>
+        <span>{t.settings.model}</span>
         <select
           value={settings.summaryModel}
           onChange={(e) => update('summaryModel', (e.target as HTMLSelectElement).value)}
@@ -71,53 +79,74 @@ export function SettingsView({ onClose }: Props) {
           {AVAILABLE_MODELS.map((m) => (
             <option key={m.id} value={m.id}>
               {m.label}
-              {m.note ? ` — ${m.note}` : ''}
             </option>
           ))}
         </select>
       </label>
 
       <label class="field">
-        <span>Langue de sortie</span>
-        <input
-          type="text"
-          value={settings.outputLanguage}
-          onInput={(e) => update('outputLanguage', (e.target as HTMLInputElement).value)}
-        />
+        <span>{t.settings.uiLanguage}</span>
+        <select
+          value={settings.uiLanguage}
+          onChange={(e) => changeUiLanguage((e.target as HTMLSelectElement).value)}
+        >
+          {SUPPORTED_LOCALES.map((loc) => (
+            <option key={loc} value={loc}>
+              {LOCALE_LABELS[loc]}
+            </option>
+          ))}
+        </select>
       </label>
 
       <label class="field">
-        <span>Niveau de détail</span>
+        <span>{t.settings.outputLanguage}</span>
+        <select
+          value={settings.outputLanguage}
+          onChange={(e) => {
+            const v = (e.target as HTMLSelectElement).value;
+            if (isLocale(v)) update('outputLanguage', v);
+          }}
+        >
+          {SUPPORTED_LOCALES.map((loc) => (
+            <option key={loc} value={loc}>
+              {LOCALE_LABELS[loc]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label class="field">
+        <span>{t.settings.detailLevel}</span>
         <select
           value={settings.detailLevel}
           onChange={(e) =>
             update('detailLevel', (e.target as HTMLSelectElement).value as DetailLevel)
           }
         >
-          {DETAIL_LEVELS.map((d) => (
-            <option key={d.value} value={d.value}>
-              {d.label}
+          {DETAIL_ORDER.map((level) => (
+            <option key={level} value={level}>
+              {t.settings.detailLevels[level]}
             </option>
           ))}
         </select>
       </label>
 
       <label class="field">
-        <span>Template de résumé</span>
+        <span>{t.settings.template}</span>
         <select
           value={settings.templateId}
           onChange={(e) => update('templateId', (e.target as HTMLSelectElement).value)}
         >
-          {listTemplates().map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
+          {listTemplates().map((tpl) => (
+            <option key={tpl.id} value={tpl.id}>
+              {tpl.label}
             </option>
           ))}
         </select>
       </label>
 
       <button class="primary" onClick={() => void save()}>
-        {saved ? 'Enregistré ✓' : 'Enregistrer'}
+        {saved ? t.settings.saved : t.settings.save}
       </button>
     </div>
   );

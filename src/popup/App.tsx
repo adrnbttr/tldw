@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { Broadcast, BatchState, DetectedVideo, JobState, Summary } from '@/types';
+import type { Locale } from '@/i18n';
+import { detectDefaultLocale, getCatalog } from '@/i18n';
+import { I18nContext } from '@/i18n/context';
+import { getSettings } from '@/storage';
 import { listVideos, requestBatch, getBatchState, getActiveJob } from './messaging';
 import { VideoList } from './components/VideoList';
 import { ProcessingView } from './components/ProcessingView';
@@ -18,6 +22,7 @@ import { BatchView } from './components/BatchView';
 type Screen = 'list' | 'settings' | 'history' | 'batch';
 
 export function App() {
+  const [locale, setLocale] = useState<Locale>(detectDefaultLocale());
   const [screen, setScreen] = useState<Screen>('list');
   const [videos, setVideos] = useState<DetectedVideo[]>([]);
   const [active, setActive] = useState<DetectedVideo | null>(null);
@@ -26,6 +31,7 @@ export function App() {
   const [historySummary, setHistorySummary] = useState<Summary | null>(null);
 
   useEffect(() => {
+    void getSettings().then((s) => setLocale(s.uiLanguage));
     void listVideos().then(setVideos);
 
     // Restore in-flight work after the popup was closed and reopened (F2).
@@ -69,35 +75,35 @@ export function App() {
     void listVideos().then(setVideos);
   };
 
-  if (screen === 'settings') {
-    return <SettingsView onClose={() => setScreen('list')} />;
-  }
-
-  if (screen === 'history') {
-    if (historySummary) {
-      return <ResultView summary={historySummary} onBack={() => setHistorySummary(null)} />;
+  const content = () => {
+    if (screen === 'settings') {
+      return <SettingsView onClose={() => setScreen('list')} onLocaleChange={setLocale} />;
     }
-    return <HistoryView onOpen={setHistorySummary} onClose={() => setScreen('list')} />;
-  }
+    if (screen === 'history') {
+      if (historySummary) {
+        return <ResultView summary={historySummary} onBack={() => setHistorySummary(null)} />;
+      }
+      return <HistoryView onOpen={setHistorySummary} onClose={() => setScreen('list')} />;
+    }
+    if (screen === 'batch') {
+      return <BatchView state={batchState} onBack={backToList} />;
+    }
+    if (active && jobState.phase === 'done') {
+      return <ResultView summary={jobState.summary} onBack={backToList} />;
+    }
+    if (active && (jobState.phase === 'running' || jobState.phase === 'error')) {
+      return <ProcessingView video={active} state={jobState} onBack={backToList} />;
+    }
+    return (
+      <VideoList
+        videos={videos}
+        onSummarize={startFor}
+        onBatch={startBatch}
+        onOpenSettings={() => setScreen('settings')}
+        onOpenHistory={() => setScreen('history')}
+      />
+    );
+  };
 
-  if (screen === 'batch') {
-    return <BatchView state={batchState} onBack={backToList} />;
-  }
-
-  if (active && jobState.phase === 'done') {
-    return <ResultView summary={jobState.summary} onBack={backToList} />;
-  }
-  if (active && (jobState.phase === 'running' || jobState.phase === 'error')) {
-    return <ProcessingView video={active} state={jobState} onBack={backToList} />;
-  }
-
-  return (
-    <VideoList
-      videos={videos}
-      onSummarize={startFor}
-      onBatch={startBatch}
-      onOpenSettings={() => setScreen('settings')}
-      onOpenHistory={() => setScreen('history')}
-    />
-  );
+  return <I18nContext.Provider value={getCatalog(locale)}>{content()}</I18nContext.Provider>;
 }

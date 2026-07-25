@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import type { Summary } from '@/types';
 import { renderMarkdown } from '@/shared/markdown';
-import { sourceLabel } from '@/summarizer/template';
+import { useI18n } from '@/i18n/context';
 import { copyMarkdown, downloadMarkdown } from '../export';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export function ResultView({ summary, onBack }: Props) {
+  const t = useI18n();
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -22,12 +23,12 @@ export function ResultView({ summary, onBack }: Props) {
     <div class="screen">
       <header class="topbar">
         <button class="link" onClick={onBack}>
-          ← Retour
+          {t.result.back}
         </button>
-        <h1>Résumé</h1>
+        <h1>{t.result.heading}</h1>
       </header>
 
-      <p class="method">Méthode : {sourceLabel(summary.transcriptSource)}</p>
+      <p class="method">{t.result.method(t.sources[summary.transcriptSource])}</p>
 
       <div
         class="markdown"
@@ -37,10 +38,10 @@ export function ResultView({ summary, onBack }: Props) {
 
       <div class="actions">
         <button class="primary" onClick={() => downloadMarkdown(summary)}>
-          Télécharger (.md)
+          {t.result.download}
         </button>
         <button class="secondary" onClick={() => void copy()}>
-          {copied ? 'Copié ✓' : 'Copier'}
+          {copied ? t.result.copied : t.result.copy}
         </button>
       </div>
     </div>

@@ -97,8 +97,9 @@ export async function runBatch(
     } else if (state.phase === 'error') {
       results.push({
         videoId: video.id,
-        title: video.title ?? 'Vidéo sans titre',
+        title: video.title ?? 'Untitled video',
         ok: false,
+        code: state.code,
         message: state.message,
       });
     }
