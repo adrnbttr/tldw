@@ -32,7 +32,7 @@ justifications, data disclosures) are in [`listing.md`](./listing.md).
 
 ## 4. Privacy
 
-- Privacy policy is hosted at <https://adrnbttr.github.io/tldw/> (GitHub Pages,
+- Privacy policy is hosted at <https://www.adrienbouttier.com/tldw/> (GitHub Pages,
   served from `docs/`).
 - In the dashboard, complete the **Privacy practices** tab: declare *no data
   collection by the developer*, justify each permission (table in `listing.md`),

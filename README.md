@@ -178,7 +178,7 @@ Detailed roadmap in [`docs/ROADMAP.md`](./docs/ROADMAP.md).
 
 Extracting content behind authentication may be governed by a site's terms of use. **Confirming that your usage is permitted is your responsibility.** tldw is built for personal use on content you legitimately have access to, and never attempts to bypass DRM — encrypted media surfaces a `MEDIA_PROTECTED` error instead.
 
-Read the [privacy policy](https://adrnbttr.github.io/tldw/) · [`docs/PRIVACY.md`](./docs/PRIVACY.md). Chrome Web Store packaging and submission notes live in [`store/`](./store/).
+Read the [privacy policy](https://www.adrienbouttier.com/tldw/) · [`docs/PRIVACY.md`](./docs/PRIVACY.md). Chrome Web Store packaging and submission notes live in [`store/`](./store/).
 
 ## License
 

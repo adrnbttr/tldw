@@ -89,5 +89,5 @@ Copy each justification into the matching field at submission time.
 ## Privacy policy URL
 
 ```
-https://adrnbttr.github.io/tldw/
+https://www.adrienbouttier.com/tldw/
 ```
