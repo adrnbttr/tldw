@@ -208,11 +208,9 @@ async function fetchTimedtext(
 
   // YouTube serves empty timedtext to the service worker — retry from the page.
   if (!raw) {
-    const viaPage = (await fetchTextViaPage(url.toString()))?.trim() ?? '';
-    if (viaPage) {
-      diag.push(`tt(${label})-viapage`);
-      raw = viaPage;
-    }
+    const viaPage = await fetchTextViaPage(url.toString());
+    diag.push(`vp(${label})=${viaPage == null ? 'null' : 'len' + viaPage.trim().length}`);
+    if (viaPage && viaPage.trim()) raw = viaPage.trim();
   }
 
   if (!raw) {
