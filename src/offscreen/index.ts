@@ -46,9 +46,10 @@ async function runJob(job: TranscribeJob): Promise<void> {
   const t = getCatalog(isLocale(job.uiLanguage) ? job.uiLanguage : 'en').transcription;
   const progress = (detail: string) =>
     report({ type: 'OFFSCREEN_PROGRESS', videoId: job.videoId, detail });
+  const diag: string[] = [];
 
   try {
-    const mediaBytes = await downloadSource(job, t, progress);
+    const mediaBytes = await downloadSource(job, t, progress, diag);
 
     progress(t.extractingAudio);
     const mp3 = await audio.toMonoMp3(mediaBytes, 'input.media');
@@ -64,15 +65,22 @@ async function runJob(job: TranscribeJob): Promise<void> {
   } catch (err) {
     audio.terminate();
     const code = err instanceof TldwError ? err.code : 'UNKNOWN';
-    // Carry the technical detail (ffmpeg/API) so the popup can show it.
-    const detail = err instanceof TldwError ? (err.providerMessage ?? '') : String(err);
-    report({
-      type: 'OFFSCREEN_RESULT',
-      videoId: job.videoId,
-      ok: false,
-      code,
-      message: detail,
-    });
+    // Carry the technical detail (ffmpeg/API) + source diagnostics so the popup
+    // can show exactly what the host served.
+    const base = err instanceof TldwError ? (err.providerMessage ?? '') : String(err);
+    const detail = [base, diag.join(' ')].filter(Boolean).join(' ‹ ');
+    console.error('[tldw] audio fallback failed', { code, detail, sources: job.sources });
+    report({ type: 'OFFSCREEN_RESULT', videoId: job.videoId, ok: false, code, message: detail });
+  }
+}
+
+/** Pathname only (no query/token) — safe to show for diagnostics. */
+function safePath(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.host + u.pathname;
+  } catch {
+    return '?';
   }
 }
 
@@ -149,11 +157,14 @@ async function downloadSource(
   job: TranscribeJob,
   t: Messages['transcription'],
   progress: (detail: string) => void,
+  diag: string[],
 ): Promise<Uint8Array> {
   const best = pickBestCandidate(job.sources);
+  diag.push(`captured=[${job.sources.map((s) => s.kind).join(',') || 'none'}]`);
   if (!best) {
     throw new TldwError('MEDIA_NOT_CAPTURABLE', 'No media source was captured.');
   }
+  diag.push(`chosen=${best.kind}:${safePath(best.url)}`);
 
   progress(t.fetchingMedia);
 
@@ -168,6 +179,7 @@ async function downloadSource(
     // Master playlist → resolve to a media playlist (audio-only if available).
     if (isHlsMaster(playlist)) {
       const variant = pickHlsVariant(playlist, url);
+      diag.push(`master→variant=${variant ? safePath(variant) : 'none'}`);
       if (!variant) {
         throw new TldwError('MEDIA_NOT_CAPTURABLE', 'No usable variant in HLS master.');
       }
@@ -176,6 +188,7 @@ async function downloadSource(
     }
 
     const { initUrl, segmentUrls } = parseHlsMedia(playlist, url);
+    diag.push(`hls map=${initUrl ? 'yes' : 'no'} segs=${segmentUrls.length}`);
     if (segmentUrls.length === 0) {
       throw new TldwError('MEDIA_NOT_CAPTURABLE', 'HLS playlist had no segments.');
     }
