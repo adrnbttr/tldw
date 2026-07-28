@@ -1,5 +1,5 @@
 import type { Settings, Summary } from '@/types';
-import { DEFAULT_SETTINGS } from '@/types';
+import { DEFAULT_SETTINGS, AVAILABLE_MODELS } from '@/types';
 import { detectDefaultLocale } from '@/i18n';
 
 /**
@@ -19,6 +19,10 @@ export async function getSettings(): Promise<Settings> {
   // First run: default both languages to the browser's UI language.
   if (!raw?.uiLanguage) merged.uiLanguage = detectDefaultLocale();
   if (!raw?.outputLanguage) merged.outputLanguage = detectDefaultLocale();
+  // Heal a stored summary model that OpenRouter no longer serves.
+  if (!AVAILABLE_MODELS.some((m) => m.id === merged.summaryModel)) {
+    merged.summaryModel = DEFAULT_SETTINGS.summaryModel;
+  }
   return merged;
 }
 
