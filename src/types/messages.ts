@@ -85,3 +85,6 @@ export type Broadcast =
 
 /** content → background (detection results for the active tab). */
 export type ContentMessage = { type: 'VIDEOS_DETECTED'; videos: DetectedVideo[] };
+
+/** background → content: briefly play a video (muted) to trigger media capture. */
+export type PrimeMediaMessage = { type: 'PRIME_MEDIA'; video: DetectedVideo };

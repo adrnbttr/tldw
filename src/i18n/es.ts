@@ -85,6 +85,8 @@ export const es: Messages = {
     QUOTA_EXCEEDED: 'Cuota de la API superada.',
     MEDIA_NOT_CAPTURABLE:
       'No se pudo recuperar el flujo de vídeo. Puede que este proveedor no sea compatible.',
+    MEDIA_NEEDS_PLAYBACK:
+      'Reproduce el vídeo unos segundos y vuelve a intentarlo — el flujo debe cargarse primero.',
     MEDIA_PROTECTED:
       'El contenido está protegido (cifrado). No se puede realizar la transcripción de audio.',
     AUDIO_EXTRACTION_FAILED: 'No se pudo aislar la pista de audio.',

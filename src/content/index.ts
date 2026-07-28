@@ -1,4 +1,4 @@
-import type { ContentMessage, DetectedVideo } from '@/types';
+import type { ContentMessage, DetectedVideo, PrimeMediaMessage } from '@/types';
 import { dedupe, externalIdFromUrl, makeDetected, providerFromUrl } from './detect';
 
 /**
@@ -85,6 +85,65 @@ function publish(): void {
     // Background not ready yet — the next mutation will retry.
   });
 }
+
+/**
+ * Briefly plays the target video (muted) so its media requests fire and the
+ * background can capture them — sparing the user from starting playback manually.
+ * Best-effort: browser autoplay policies may still require a real user gesture.
+ */
+function primeMedia(video: DetectedVideo): void {
+  try {
+    if (video.provider === 'native') {
+      const el = document.querySelector('video');
+      if (!el) return;
+      el.muted = true;
+      void el.play().catch(() => {});
+      window.setTimeout(() => {
+        try {
+          el.pause();
+        } catch {
+          /* ignore */
+        }
+      }, 4000);
+      return;
+    }
+
+    const iframes = [...document.querySelectorAll<HTMLIFrameElement>('iframe[src]')];
+    const iframe =
+      iframes.find((f) => f.src === video.iframeSrc) ||
+      (video.externalId ? iframes.find((f) => f.src.includes(video.externalId)) : undefined);
+    const win = iframe?.contentWindow;
+    if (!win) return;
+
+    if (video.provider === 'vimeo') {
+      win.postMessage(
+        JSON.stringify({ method: 'setVolume', value: 0 }),
+        'https://player.vimeo.com',
+      );
+      win.postMessage(JSON.stringify({ method: 'play' }), 'https://player.vimeo.com');
+      window.setTimeout(
+        () => win.postMessage(JSON.stringify({ method: 'pause' }), 'https://player.vimeo.com'),
+        4000,
+      );
+    } else if (video.provider === 'youtube') {
+      // Only works when the embed has enablejsapi=1; harmless otherwise.
+      win.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
+      win.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+      window.setTimeout(
+        () =>
+          win.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*'),
+        4000,
+      );
+    }
+  } catch {
+    /* best-effort */
+  }
+}
+
+chrome.runtime.onMessage.addListener((message: PrimeMediaMessage) => {
+  if (message.type === 'PRIME_MEDIA') primeMedia(message.video);
+  return false;
+});
 
 publish();
 

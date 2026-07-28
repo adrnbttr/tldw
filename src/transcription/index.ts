@@ -3,6 +3,7 @@ import { TldwError, buildFullText } from '@/types';
 import { getCapturedMedia } from '@/background/media-capture';
 import type { MediaCandidate } from './media';
 import { classifyMedia } from './media';
+import { getCatalog, isLocale } from '@/i18n';
 import type { OffscreenRequest, OffscreenResponse, TranscribeJob } from './offscreen-protocol';
 import { OFFSCREEN_PATH } from './offscreen-protocol';
 
@@ -39,9 +40,19 @@ export const audioTranscriber: Transcriber = {
       throw new TldwError('MISSING_TRANSCRIPTION_KEY', 'Whisper requires an OpenAI key.');
     }
 
-    const sources = await resolveSources(video);
+    let sources = await resolveSources(video);
     if (sources.length === 0) {
-      throw new TldwError('MEDIA_NOT_CAPTURABLE', 'No media source found for this video.');
+      // Nothing captured yet — nudge the page to start the video, then re-check.
+      const loc = isLocale(settings.uiLanguage) ? settings.uiLanguage : 'en';
+      onProgress(getCatalog(loc).transcription.fetchingMedia);
+      await primeAndWait(video);
+      sources = await resolveSources(video);
+    }
+    if (sources.length === 0) {
+      throw new TldwError(
+        'MEDIA_NEEDS_PLAYBACK',
+        'No media captured; the video needs to start playing.',
+      );
     }
 
     await ensureOffscreen();
@@ -71,6 +82,19 @@ export const audioTranscriber: Transcriber = {
     return normalize(video, language, segments);
   },
 };
+
+/** Asks the page to briefly play the video, then waits for capture to happen. */
+async function primeAndWait(video: DetectedVideo): Promise<void> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id == null) return;
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'PRIME_MEDIA', video });
+  } catch {
+    // No content script on this page — nothing to do.
+    return;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+}
 
 /** Collects candidate media sources: Vimeo progressive/HLS + captured requests. */
 async function resolveSources(video: DetectedVideo): Promise<MediaCandidate[]> {

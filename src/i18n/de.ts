@@ -85,6 +85,8 @@ export const de: Messages = {
     QUOTA_EXCEEDED: 'API-Kontingent überschritten.',
     MEDIA_NOT_CAPTURABLE:
       'Der Videostream konnte nicht abgerufen werden. Dieser Anbieter wird möglicherweise nicht unterstützt.',
+    MEDIA_NEEDS_PLAYBACK:
+      'Spiele das Video ein paar Sekunden ab und versuche es erneut — der Stream muss erst laden.',
     MEDIA_PROTECTED:
       'Der Inhalt ist geschützt (verschlüsselt). Eine Audio-Transkription ist nicht möglich.',
     AUDIO_EXTRACTION_FAILED: 'Das Isolieren der Audiospur ist fehlgeschlagen.',

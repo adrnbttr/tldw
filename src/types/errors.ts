@@ -9,6 +9,7 @@ export type TldwErrorCode =
   | 'NO_CAPTIONS_AVAILABLE'
   // Extraction — audio fallback
   | 'MEDIA_NOT_CAPTURABLE'
+  | 'MEDIA_NEEDS_PLAYBACK'
   | 'MEDIA_PROTECTED'
   | 'AUDIO_EXTRACTION_FAILED'
   | 'TRANSCRIPTION_API_ERROR'
@@ -51,6 +52,8 @@ export const ERROR_MESSAGES: Record<TldwErrorCode, string> = {
     'Transcription key missing. Add it in the settings to enable the audio fallback.',
   QUOTA_EXCEEDED: 'API quota exceeded.',
   MEDIA_NOT_CAPTURABLE: 'The video stream could not be retrieved. This host may not be supported.',
+  MEDIA_NEEDS_PLAYBACK:
+    'Play the video for a few seconds, then try again — the media stream needs to load first.',
   MEDIA_PROTECTED: 'The content is protected (encrypted). Audio transcription cannot be performed.',
   AUDIO_EXTRACTION_FAILED: 'Isolating the audio track failed.',
   TRANSCRIPTION_API_ERROR: 'The transcription service returned an error.',

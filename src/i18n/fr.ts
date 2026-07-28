@@ -84,6 +84,8 @@ export const fr: Messages = {
     QUOTA_EXCEEDED: 'Quota API dépassé.',
     MEDIA_NOT_CAPTURABLE:
       "Le flux vidéo n'a pas pu être récupéré. Cet hébergeur n'est peut-être pas supporté.",
+    MEDIA_NEEDS_PLAYBACK:
+      'Lancez la lecture de la vidéo quelques secondes, puis réessayez — le flux doit charger.',
     MEDIA_PROTECTED:
       'Le contenu est protégé (chiffré). La transcription audio ne peut pas être effectuée.',
     AUDIO_EXTRACTION_FAILED: "L'isolation de la piste audio a échoué.",

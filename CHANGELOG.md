@@ -8,6 +8,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Auto-start for the audio fallback.** When a video has no captions and no media
+  has been captured yet, tldw briefly plays it muted (via the page player) to
+  trigger the stream, so the user no longer has to press play first. If the browser
+  blocks autoplay, a clear `MEDIA_NEEDS_PLAYBACK` message asks them to play a couple
+  of seconds — instead of the misleading "host not supported".
 - **Single-provider audio transcription.** The audio fallback now transcribes via
   OpenRouter (Gemini multimodal) by default, so one OpenRouter key covers both
   summaries and transcription — no separate OpenAI/Whisper account needed. Whisper

@@ -84,6 +84,8 @@ export const en: Messages = {
     QUOTA_EXCEEDED: 'API quota exceeded.',
     MEDIA_NOT_CAPTURABLE:
       'The video stream could not be retrieved. This host may not be supported.',
+    MEDIA_NEEDS_PLAYBACK:
+      'Play the video for a few seconds, then try again — the stream needs to load first.',
     MEDIA_PROTECTED:
       'The content is protected (encrypted). Audio transcription cannot be performed.',
     AUDIO_EXTRACTION_FAILED: 'Isolating the audio track failed.',
