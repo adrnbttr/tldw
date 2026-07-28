@@ -5,7 +5,12 @@ import type {
   OffscreenResponse,
   TranscribeJob,
 } from '@/transcription/offscreen-protocol';
-import { pickBestCandidate, resolveSegmentUrls } from '@/transcription/media';
+import {
+  pickBestCandidate,
+  isHlsMaster,
+  pickHlsVariant,
+  parseHlsMedia,
+} from '@/transcription/media';
 import { FfmpegAudio, AUDIO_BYTES_PER_SECOND } from '@/transcription/audio';
 import { planChunks, mergeChunkTranscripts } from '@/transcription/chunker';
 import { transcribeAudio } from '@/transcription/whisper';
@@ -157,12 +162,27 @@ async function downloadSource(
   }
 
   if (best.kind === 'hls') {
-    const playlist = await (await fetchAuth(best.url)).text();
-    const segmentUrls = resolveSegmentUrls(playlist, best.url);
+    let url = best.url;
+    let playlist = await (await fetchAuth(url)).text();
+
+    // Master playlist → resolve to a media playlist (audio-only if available).
+    if (isHlsMaster(playlist)) {
+      const variant = pickHlsVariant(playlist, url);
+      if (!variant) {
+        throw new TldwError('MEDIA_NOT_CAPTURABLE', 'No usable variant in HLS master.');
+      }
+      url = variant;
+      playlist = await (await fetchAuth(url)).text();
+    }
+
+    const { initUrl, segmentUrls } = parseHlsMedia(playlist, url);
     if (segmentUrls.length === 0) {
       throw new TldwError('MEDIA_NOT_CAPTURABLE', 'HLS playlist had no segments.');
     }
+
     const parts: Uint8Array[] = [];
+    // The fMP4 init segment MUST come first, or the fragments are undecodable.
+    if (initUrl) parts.push(await fetchBytes(initUrl));
     for (let i = 0; i < segmentUrls.length; i++) {
       progress(t.assembling(i + 1, segmentUrls.length));
       parts.push(await fetchBytes(segmentUrls[i]));

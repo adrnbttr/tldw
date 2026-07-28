@@ -51,14 +51,74 @@ export function pickBestCandidate(candidates: MediaCandidate[]): MediaCandidate 
   return [...candidates].sort((a, b) => KIND_RANK[b.kind] - KIND_RANK[a.kind])[0];
 }
 
+function resolveUri(uri: string, playlistUrl: string): string {
+  if (uri.startsWith('http')) return uri;
+  const base = playlistUrl.slice(0, playlistUrl.lastIndexOf('/') + 1);
+  return base + uri;
+}
+
 /** Resolves relative segment URIs from an HLS playlist against its base URL. */
 export function resolveSegmentUrls(playlist: string, playlistUrl: string): string[] {
-  const base = playlistUrl.slice(0, playlistUrl.lastIndexOf('/') + 1);
   const urls: string[] = [];
   for (const rawLine of playlist.split('\n')) {
     const line = rawLine.trim();
     if (!line || line.startsWith('#')) continue;
-    urls.push(line.startsWith('http') ? line : base + line);
+    urls.push(resolveUri(line, playlistUrl));
   }
   return urls;
+}
+
+/** True for a master playlist (points to variant streams, not media segments). */
+export function isHlsMaster(playlist: string): boolean {
+  return playlist.includes('#EXT-X-STREAM-INF') || /#EXT-X-MEDIA:[^\n]*URI=/.test(playlist);
+}
+
+/**
+ * From a master playlist, picks the lightest usable rendition: a dedicated audio
+ * track if present, otherwise the lowest-bandwidth variant (we only need audio).
+ */
+export function pickHlsVariant(playlist: string, playlistUrl: string): string | null {
+  const lines = playlist.split('\n').map((l) => l.trim());
+
+  for (const line of lines) {
+    if (line.startsWith('#EXT-X-MEDIA:') && /TYPE=AUDIO/.test(line)) {
+      const uri = line.match(/URI="([^"]+)"/)?.[1];
+      if (uri) return resolveUri(uri, playlistUrl);
+    }
+  }
+
+  let best: { bandwidth: number; url: string } | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith('#EXT-X-STREAM-INF')) continue;
+    const bandwidth = Number(lines[i].match(/BANDWIDTH=(\d+)/)?.[1] ?? Number.MAX_SAFE_INTEGER);
+    const uri = lines.slice(i + 1).find((l) => l && !l.startsWith('#'));
+    if (uri && (!best || bandwidth < best.bandwidth)) {
+      best = { bandwidth, url: resolveUri(uri, playlistUrl) };
+    }
+  }
+  return best?.url ?? null;
+}
+
+export interface HlsMedia {
+  /** Initialization segment (fMP4 `#EXT-X-MAP`), required before the fragments. */
+  initUrl: string | null;
+  segmentUrls: string[];
+}
+
+/** Parses a media playlist: the init segment (if fMP4) plus the media segments. */
+export function parseHlsMedia(playlist: string, playlistUrl: string): HlsMedia {
+  let initUrl: string | null = null;
+  const segmentUrls: string[] = [];
+  for (const rawLine of playlist.split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (line.startsWith('#EXT-X-MAP:')) {
+      const uri = line.match(/URI="([^"]+)"/)?.[1];
+      if (uri) initUrl = resolveUri(uri, playlistUrl);
+      continue;
+    }
+    if (line.startsWith('#')) continue;
+    segmentUrls.push(resolveUri(line, playlistUrl));
+  }
+  return { initUrl, segmentUrls };
 }
