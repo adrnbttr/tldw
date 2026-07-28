@@ -8,9 +8,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **Word (.docx) export.** A one-click, nicely formatted Word document (headings,
-  bullet lists, bold glossary terms) built from the structured summary and localized
-  in the output language — the primary export now; Markdown stays available.
+- **PDF & Word export.** One-click, nicely formatted **PDF** (primary) and **Word
+  (.docx)** documents built from the structured summary — headings, bullet lists,
+  bold glossary terms — localized in the output language. Batch export produces a
+  single combined PDF. The technical Markdown download was dropped from the UI;
+  Copy now yields clean plain text.
 - Wider popup (460px) and a cleaner processing view: the step detail sits on its own
   line and single-block transcription shows a plain label instead of "1/1 · 0:00".
 - **Auto-start for the audio fallback.** When a video has no captions and no media

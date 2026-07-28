@@ -2,8 +2,9 @@ import { useState } from 'preact/hooks';
 import type { Summary } from '@/types';
 import { renderMarkdown } from '@/shared/markdown';
 import { useI18n } from '@/i18n/context';
-import { copyMarkdown, downloadMarkdown } from '../export';
+import { copyPlainText } from '../export';
 import { downloadDocx } from '../export-docx';
+import { downloadPdf } from '../export-pdf';
 
 interface Props {
   summary: Summary;
@@ -15,7 +16,7 @@ export function ResultView({ summary, onBack }: Props) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
-    await copyMarkdown(summary);
+    await copyPlainText(summary);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -37,12 +38,12 @@ export function ResultView({ summary, onBack }: Props) {
         dangerouslySetInnerHTML={{ __html: renderMarkdown(summary.markdown) }}
       />
 
-      <button class="primary" onClick={() => void downloadDocx(summary)}>
-        {t.result.downloadWord}
+      <button class="primary" onClick={() => downloadPdf(summary)}>
+        {t.result.downloadPdf}
       </button>
       <div class="actions">
-        <button class="secondary" onClick={() => downloadMarkdown(summary)}>
-          {t.result.download}
+        <button class="secondary" onClick={() => void downloadDocx(summary)}>
+          {t.result.downloadWord}
         </button>
         <button class="secondary" onClick={() => void copy()}>
           {copied ? t.result.copied : t.result.copy}

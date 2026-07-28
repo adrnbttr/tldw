@@ -1,6 +1,6 @@
 import type { BatchState } from '@/types';
 import { useI18n } from '@/i18n/context';
-import { downloadBatchMarkdown } from '../export';
+import { downloadPdfBatch } from '../export-pdf';
 
 interface Props {
   state: BatchState;
@@ -46,7 +46,7 @@ export function BatchView({ state, onBack }: Props) {
           </ul>
 
           {state.summaries.length > 0 && (
-            <button class="primary" onClick={() => downloadBatchMarkdown(state.summaries)}>
+            <button class="primary" onClick={() => downloadPdfBatch(state.summaries)}>
               {t.batch.downloadAll(state.summaries.length)}
             </button>
           )}

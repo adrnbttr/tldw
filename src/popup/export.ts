@@ -19,6 +19,22 @@ export async function copyMarkdown(summary: Summary): Promise<void> {
   await navigator.clipboard.writeText(summary.markdown);
 }
 
+/** Strips Markdown syntax so a paste is clean prose, not `#`/`**`/`-`. */
+export function toPlainText(markdown: string): string {
+  return (
+    markdown
+      .replace(/^#{1,6}\s+/gm, '')
+      .replace(/\*\*/g, '')
+      .replace(/^\s*[-*]\s+/gm, '• ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim() + '\n'
+  );
+}
+
+export async function copyPlainText(summary: Summary): Promise<void> {
+  await navigator.clipboard.writeText(toPlainText(summary.markdown));
+}
+
 /** Concatenates several summaries into one Markdown document (F8 batch export). */
 export function concatMarkdown(summaries: Summary[]): string {
   return summaries.map((s) => s.markdown.trim()).join('\n\n---\n\n') + '\n';
