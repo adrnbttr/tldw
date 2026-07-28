@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import type { Summary } from '@/types';
-import { templateStrings } from '@/summarizer/template';
+import { templateStrings, detectSummaryLocale } from '@/summarizer/template';
 import { isoDate, slugify } from '@/shared/format';
 
 /**
@@ -22,7 +22,7 @@ function ascii(text: string): string {
 }
 
 function renderSummary(doc: jsPDF, summary: Summary): void {
-  const s = templateStrings(summary.locale);
+  const s = templateStrings(detectSummaryLocale(summary.markdown));
   const c = summary.content;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();

@@ -1,6 +1,6 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 import type { Summary } from '@/types';
-import { templateStrings } from '@/summarizer/template';
+import { templateStrings, detectSummaryLocale } from '@/summarizer/template';
 import { isoDate, slugify } from '@/shared/format';
 
 /**
@@ -21,7 +21,7 @@ function bullets(items: string[]): Paragraph[] {
 }
 
 export function buildDocx(summary: Summary): Document {
-  const s = templateStrings(summary.locale);
+  const s = templateStrings(detectSummaryLocale(summary.markdown));
   const c = summary.content;
   const children: Paragraph[] = [];
 

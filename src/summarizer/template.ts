@@ -1,5 +1,6 @@
 import type { SummaryContent, TranscriptSource } from '@/types';
 import type { Locale } from '@/i18n';
+import { SUPPORTED_LOCALES } from '@/i18n';
 
 /**
  * Versioned summary template (F7).
@@ -114,9 +115,21 @@ function strings(locale: Locale): Strings {
 
 export type TemplateStrings = Strings;
 
-/** Localized headings/labels for a locale — reused by the Word export. */
+/** Localized headings/labels for a locale — reused by the Word/PDF exports. */
 export function templateStrings(locale: Locale): TemplateStrings {
   return strings(locale);
+}
+
+/**
+ * Detects the language of a rendered summary from its headings — the reliable
+ * source of truth for exports, even when a stored summary predates the `locale`
+ * field. Falls back to English.
+ */
+export function detectSummaryLocale(markdown: string): Locale {
+  for (const loc of SUPPORTED_LOCALES) {
+    if (markdown.includes(`## ${STRINGS[loc].inBrief}`)) return loc;
+  }
+  return 'en';
 }
 
 const SCHEMA_HINT = [

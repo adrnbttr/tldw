@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseSummaryContent, splitIntoBlocks } from './index';
-import { getTemplate, listTemplates } from './template';
+import { getTemplate, listTemplates, detectSummaryLocale } from './template';
 
 describe('parseSummaryContent', () => {
   it('parses raw JSON', () => {
@@ -54,6 +54,14 @@ describe('template rendering', () => {
     expect(md).toContain('## Points clés');
     expect(md).toContain('**Méthode:** Sous-titres YouTube');
     expect(md).toContain('- **Terme** — Déf.');
+  });
+
+  it('detects the summary language from its headings', () => {
+    expect(detectSummaryLocale('# T\n\n## En bref\nx')).toBe('fr');
+    expect(detectSummaryLocale('# T\n\n## In brief\nx')).toBe('en');
+    expect(detectSummaryLocale('# T\n\n## Kurz gesagt\nx')).toBe('de');
+    expect(detectSummaryLocale('# T\n\n## En resumen\nx')).toBe('es');
+    expect(detectSummaryLocale('no headings here')).toBe('en');
   });
 
   it('localizes headings by output language', () => {
