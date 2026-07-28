@@ -28,22 +28,29 @@ export const youtubeAdapter: Adapter = {
 
   async extractCaptions(video, signal) {
     const diag: string[] = [];
-    const tracks = await fetchCaptionTracks(video.externalId, diag, signal);
-    if (tracks.length === 0) {
+    try {
+      const tracks = await fetchCaptionTracks(video.externalId, diag, signal);
+      if (tracks.length === 0) {
+        throw new TldwError('NO_CAPTIONS_AVAILABLE', 'No caption tracks.', diag.join(' '));
+      }
+
+      const track = pickTrack(tracks);
+      diag.push(`picked=${track?.languageCode ?? '?'} base=${track?.baseUrl ? 'y' : 'NO'}`);
+      const segments = await fetchTrackSegments(track, diag, signal);
+      if (segments.length === 0) {
+        throw new TldwError('NO_CAPTIONS_AVAILABLE', 'Empty caption track.', diag.join(' '));
+      }
+
+      return normalize(video, track.languageCode, segments);
+    } catch (err) {
+      if (err instanceof TldwError) throw err;
+      // Any unexpected failure becomes a typed, diagnosable NO_CAPTIONS.
       throw new TldwError(
         'NO_CAPTIONS_AVAILABLE',
-        'No caption tracks for this video.',
-        diag.join(' '),
+        'Caption extraction failed.',
+        `${err} ${diag.join(' ')}`,
       );
     }
-
-    const track = pickTrack(tracks);
-    const segments = await fetchTrackSegments(track, signal);
-    if (segments.length === 0) {
-      throw new TldwError('NO_CAPTIONS_AVAILABLE', 'Caption track was empty.', diag.join(' '));
-    }
-
-    return normalize(video, track.languageCode, segments);
   },
 };
 
@@ -172,15 +179,29 @@ interface Json3Event {
 
 async function fetchTrackSegments(
   track: CaptionTrack,
+  diag: string[],
   signal?: AbortSignal,
 ): Promise<TranscriptSegment[]> {
+  if (!track?.baseUrl) return [];
   const url = new URL(track.baseUrl);
   url.searchParams.set('fmt', 'json3');
-  const res = await fetch(url.toString(), { credentials: 'omit', signal });
+  const res = await fetch(url.toString(), { credentials: 'include', signal });
+  diag.push(`track=${res.status}`);
   if (!res.ok) {
-    throw new TldwError('NO_CAPTIONS_AVAILABLE', `Track fetch returned ${res.status}.`);
+    throw new TldwError(
+      'NO_CAPTIONS_AVAILABLE',
+      `Track fetch returned ${res.status}.`,
+      diag.join(' '),
+    );
   }
-  const data = (await res.json()) as { events?: Json3Event[] };
+  const raw = await res.text();
+  let data: { events?: Json3Event[] };
+  try {
+    data = JSON.parse(raw) as { events?: Json3Event[] };
+  } catch {
+    diag.push(`track-nonjson len=${raw.length}`);
+    return [];
+  }
 
   const segments: TranscriptSegment[] = [];
   for (const ev of data.events ?? []) {
