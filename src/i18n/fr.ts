@@ -15,8 +15,8 @@ export const fr: Messages = {
   transcription: {
     fetchingMedia: 'Récupération du flux média…',
     extractingAudio: 'Extraction de la piste audio…',
-    assembling: (index, total) => `Assemblage des segments (${index}/${total})…`,
-    transcribing: (index, total, clock) => `Transcription ${index}/${total} (${clock})…`,
+    assembling: (index, total) => `Segments ${index}/${total}`,
+    transcribing: (index, total, clock) => `${index}/${total} · ${clock}`,
   },
   processing: {
     back: '← Retour',

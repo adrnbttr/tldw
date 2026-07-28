@@ -44,8 +44,10 @@ export function ProcessingView({ video, state, onBack }: Props) {
             {steps.map((s) => (
               <li key={s.step} class={`step step-${s.status}`}>
                 <span class="step-icon">{STATUS_ICON[s.status]}</span>
-                <span class="step-label">{t.processing.steps[s.step]}</span>
-                {s.detail && <span class="step-detail">{s.detail}</span>}
+                <span class="step-body">
+                  <span class="step-label">{t.processing.steps[s.step]}</span>
+                  {s.detail && <span class="step-detail">{s.detail}</span>}
+                </span>
               </li>
             ))}
           </ul>
