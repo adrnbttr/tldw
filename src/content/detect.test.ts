@@ -5,6 +5,7 @@ import {
   dedupe,
   makeDetected,
   dropRedundantNatives,
+  pageVideoFromUrl,
 } from './detect';
 
 describe('providerFromUrl', () => {
@@ -35,6 +36,31 @@ describe('externalIdFromUrl', () => {
   });
   it('extracts Vimeo id', () => {
     expect(externalIdFromUrl('https://player.vimeo.com/video/76979871', 'vimeo')).toBe('76979871');
+  });
+});
+
+describe('pageVideoFromUrl', () => {
+  it('detects a youtube.com watch page', () => {
+    expect(pageVideoFromUrl('https://www.youtube.com/watch?v=abc123&t=10')).toEqual({
+      provider: 'youtube',
+      externalId: 'abc123',
+    });
+  });
+  it('detects youtu.be', () => {
+    expect(pageVideoFromUrl('https://youtu.be/xyz')).toEqual({
+      provider: 'youtube',
+      externalId: 'xyz',
+    });
+  });
+  it('detects a vimeo.com page', () => {
+    expect(pageVideoFromUrl('https://vimeo.com/76979871')).toEqual({
+      provider: 'vimeo',
+      externalId: '76979871',
+    });
+  });
+  it('returns null for other pages', () => {
+    expect(pageVideoFromUrl('https://example.com/page')).toBeNull();
+    expect(pageVideoFromUrl('https://www.youtube.com/feed/subscriptions')).toBeNull();
   });
 });
 

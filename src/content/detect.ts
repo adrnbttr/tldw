@@ -42,6 +42,34 @@ export function isKnownEmbed(url: string): boolean {
   return provider === 'youtube' || provider === 'vimeo';
 }
 
+/**
+ * Detects the video of a provider's OWN watch page (youtube.com/watch, youtu.be,
+ * vimeo.com/{id}) from the page URL — where the player is a native `<video>`, not
+ * an iframe. Lets those be summarized via captions instead of the audio fallback.
+ */
+export function pageVideoFromUrl(url: string): { provider: Provider; externalId: string } | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.replace(/^www\./, '');
+  if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    const id = u.searchParams.get('v');
+    if (id) return { provider: 'youtube', externalId: id };
+  }
+  if (host === 'youtu.be') {
+    const id = u.pathname.slice(1).split('/')[0];
+    if (id) return { provider: 'youtube', externalId: id };
+  }
+  if (host === 'vimeo.com') {
+    const id = u.pathname.match(/^\/(\d+)/)?.[1];
+    if (id) return { provider: 'vimeo', externalId: id };
+  }
+  return null;
+}
+
 let counter = 0;
 function localId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();

@@ -4,8 +4,17 @@ import {
   dropRedundantNatives,
   externalIdFromUrl,
   makeDetected,
+  pageVideoFromUrl,
   providerFromUrl,
 } from './detect';
+
+/** Strips the provider suffix a watch page adds to document.title. */
+function cleanTitle(title: string): string {
+  return title
+    .replace(/\s*[-–|]\s*YouTube\s*$/i, '')
+    .replace(/\s+on Vimeo\s*$/i, '')
+    .trim();
+}
 
 /**
  * Content script (F1).
@@ -27,6 +36,19 @@ function nativeMediaSrc(video: HTMLVideoElement): string | null {
 
 function scan(): DetectedVideo[] {
   const found: DetectedVideo[] = [];
+
+  // The provider's own watch page (youtube.com/watch, youtu.be, vimeo.com/id),
+  // where the player is a native <video> rather than an iframe.
+  const page = pageVideoFromUrl(location.href);
+  if (page) {
+    found.push(
+      makeDetected({
+        provider: page.provider,
+        externalId: page.externalId,
+        title: cleanTitle(document.title) || null,
+      }),
+    );
+  }
 
   // Native <video> elements.
   for (const el of document.querySelectorAll('video')) {
