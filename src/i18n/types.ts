@@ -38,6 +38,7 @@ export interface Messages {
     extractingAudio: string;
     assembling: (index: number, total: number) => string;
     transcribing: (index: number, total: number, clock: string) => string;
+    transcribingOne: string;
   };
   processing: {
     back: string;
@@ -50,6 +51,7 @@ export interface Messages {
     back: string;
     heading: string;
     method: (source: string) => string;
+    downloadWord: string;
     download: string;
     copy: string;
     copied: string;

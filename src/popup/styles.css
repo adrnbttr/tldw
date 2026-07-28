@@ -27,7 +27,7 @@
 
 body {
   margin: 0;
-  width: 380px;
+  width: 460px;
   min-height: 200px;
   font-family:
     system-ui,
@@ -266,6 +266,7 @@ button.secondary {
   max-height: 340px;
   overflow-y: auto;
   line-height: 1.5;
+  margin-bottom: 12px;
 }
 
 .markdown h1 {

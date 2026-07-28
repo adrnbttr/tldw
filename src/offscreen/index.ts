@@ -107,7 +107,11 @@ async function transcribeWithOpenRouter(
 
   const segments: TranscriptSegment[] = [];
   for (const chunk of chunks) {
-    progress(t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)));
+    progress(
+      chunks.length === 1
+        ? t.transcribingOne
+        : t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)),
+    );
     const slice = chunks.length === 1 ? mp3 : await audio.slice(mp3, chunk.start, chunk.end);
     const text = await transcribeViaOpenRouter(slice, {
       apiKey: job.openRouterKey,
@@ -135,7 +139,11 @@ async function transcribeWithWhisper(
   let language = job.language;
 
   for (const chunk of chunks) {
-    progress(t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)));
+    progress(
+      chunks.length === 1
+        ? t.transcribingOne
+        : t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)),
+    );
     const slice = chunks.length === 1 ? mp3 : await audio.slice(mp3, chunk.start, chunk.end);
     const result = await transcribeAudio(
       new Blob([slice as BlobPart]),

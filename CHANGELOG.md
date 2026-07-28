@@ -8,6 +8,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Word (.docx) export.** A one-click, nicely formatted Word document (headings,
+  bullet lists, bold glossary terms) built from the structured summary and localized
+  in the output language — the primary export now; Markdown stays available.
+- Wider popup (460px) and a cleaner processing view: the step detail sits on its own
+  line and single-block transcription shows a plain label instead of "1/1 · 0:00".
 - **Auto-start for the audio fallback.** When a video has no captions and no media
   has been captured yet, tldw briefly plays it muted (via the page player) to
   trigger the stream, so the user no longer has to press play first. If the browser

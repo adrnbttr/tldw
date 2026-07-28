@@ -3,6 +3,7 @@ import type { Summary } from '@/types';
 import { renderMarkdown } from '@/shared/markdown';
 import { useI18n } from '@/i18n/context';
 import { copyMarkdown, downloadMarkdown } from '../export';
+import { downloadDocx } from '../export-docx';
 
 interface Props {
   summary: Summary;
@@ -36,8 +37,11 @@ export function ResultView({ summary, onBack }: Props) {
         dangerouslySetInnerHTML={{ __html: renderMarkdown(summary.markdown) }}
       />
 
+      <button class="primary" onClick={() => void downloadDocx(summary)}>
+        {t.result.downloadWord}
+      </button>
       <div class="actions">
-        <button class="primary" onClick={() => downloadMarkdown(summary)}>
+        <button class="secondary" onClick={() => downloadMarkdown(summary)}>
           {t.result.download}
         </button>
         <button class="secondary" onClick={() => void copy()}>

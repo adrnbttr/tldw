@@ -17,6 +17,7 @@ export const es: Messages = {
     extractingAudio: 'Extrayendo la pista de audio…',
     assembling: (index, total) => `Segmentos ${index}/${total}`,
     transcribing: (index, total, clock) => `${index}/${total} · ${clock}`,
+    transcribingOne: 'Transcribiendo…',
   },
   processing: {
     back: '← Atrás',
@@ -35,7 +36,8 @@ export const es: Messages = {
     back: '← Atrás',
     heading: 'Resumen',
     method: (source) => `Método: ${source}`,
-    download: 'Descargar (.md)',
+    downloadWord: 'Descargar (Word)',
+    download: 'Markdown',
     copy: 'Copiar',
     copied: 'Copiado ✓',
   },

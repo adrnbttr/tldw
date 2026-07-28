@@ -98,6 +98,7 @@ export async function summarize(
     durationLabel,
     transcriptSource: transcript.source,
     createdAt: new Date().toISOString(),
+    locale: settings.outputLanguage,
     model: settings.summaryModel,
     content,
     markdown,

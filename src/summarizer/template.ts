@@ -112,6 +112,13 @@ function strings(locale: Locale): Strings {
   return STRINGS[locale] ?? STRINGS.en;
 }
 
+export type TemplateStrings = Strings;
+
+/** Localized headings/labels for a locale — reused by the Word export. */
+export function templateStrings(locale: Locale): TemplateStrings {
+  return strings(locale);
+}
+
 const SCHEMA_HINT = [
   'Reply STRICTLY with valid JSON, no surrounding text, in this shape:',
   '{',

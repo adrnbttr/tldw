@@ -10,6 +10,7 @@ function makeSummary(title: string, markdown: string): Summary {
     durationLabel: '5 min',
     transcriptSource: 'youtube_captions',
     createdAt: '2026-07-24T10:30:00Z',
+    locale: 'fr',
     model: 'anthropic/claude-sonnet-4',
     content: { tldr: '', keyPoints: [], sections: [], glossary: [], takeaways: [] },
     markdown,

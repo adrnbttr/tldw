@@ -1,4 +1,5 @@
 import type { TranscriptSource } from './transcript';
+import type { Locale } from '@/i18n/types';
 
 /**
  * Structured summary content (F7).
@@ -33,6 +34,8 @@ export interface Summary {
   transcriptSource: TranscriptSource;
   /** ISO-8601 timestamp. */
   createdAt: string;
+  /** Output language, for localizing exports (Word headings). */
+  locale: Locale;
   /** Model id used at OpenRouter. */
   model: string;
   content: SummaryContent;
