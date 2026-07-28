@@ -33,6 +33,7 @@ export function ProcessingView({ video, state, onBack }: Props) {
         <div class="error-box">
           <p class="error-title">{t.processing.failedTitle}</p>
           <p>{t.errors[state.code]}</p>
+          {state.detail && <p class="error-detail">{state.detail}</p>}
           <button class="primary" onClick={onBack}>
             {t.processing.backToList}
           </button>

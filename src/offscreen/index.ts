@@ -1,5 +1,5 @@
 import type { TranscriptSegment } from '@/types';
-import { TldwError, messageFor } from '@/types';
+import { TldwError } from '@/types';
 import type {
   OffscreenRequest,
   OffscreenResponse,
@@ -59,12 +59,14 @@ async function runJob(job: TranscribeJob): Promise<void> {
   } catch (err) {
     audio.terminate();
     const code = err instanceof TldwError ? err.code : 'UNKNOWN';
+    // Carry the technical detail (ffmpeg/API) so the popup can show it.
+    const detail = err instanceof TldwError ? (err.providerMessage ?? '') : String(err);
     report({
       type: 'OFFSCREEN_RESULT',
       videoId: job.videoId,
       ok: false,
       code,
-      message: messageFor(err),
+      message: detail,
     });
   }
 }

@@ -160,11 +160,13 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
     broadcast(done);
   } catch (err) {
     const code = err instanceof TldwError ? err.code : 'UNKNOWN';
+    const detail = err instanceof TldwError ? err.providerMessage : undefined;
     const state: JobState = {
       phase: 'error',
       videoId: video.id,
       code,
       message: messageFor(err),
+      detail: detail?.slice(0, 300),
     };
     jobs.set(video.id, state);
     broadcast(state);

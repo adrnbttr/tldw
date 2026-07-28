@@ -183,7 +183,8 @@ function runInOffscreen(
       if (msg.type === 'OFFSCREEN_RESULT') {
         cleanup();
         if (msg.ok) resolve({ language: msg.language, segments: msg.segments });
-        else reject(new TldwError(msg.code, msg.message));
+        // msg.message carries the technical detail → keep it as providerMessage.
+        else reject(new TldwError(msg.code, 'audio fallback failed', msg.message));
       }
     };
 

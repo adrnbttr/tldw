@@ -29,7 +29,14 @@ export type JobState =
   | { phase: 'idle' }
   | { phase: 'running'; videoId: string; steps: JobProgress[] }
   | { phase: 'done'; videoId: string; summary: Summary }
-  | { phase: 'error'; videoId: string; code: TldwErrorCode; message: string };
+  | {
+      phase: 'error';
+      videoId: string;
+      code: TldwErrorCode;
+      message: string;
+      /** Optional technical detail (e.g. the underlying ffmpeg/API error). */
+      detail?: string;
+    };
 
 /** popup → background */
 export type Request =
