@@ -1,5 +1,11 @@
 import type { ContentMessage, DetectedVideo, PrimeMediaMessage } from '@/types';
-import { dedupe, externalIdFromUrl, makeDetected, providerFromUrl } from './detect';
+import {
+  dedupe,
+  dropRedundantNatives,
+  externalIdFromUrl,
+  makeDetected,
+  providerFromUrl,
+} from './detect';
 
 /**
  * Content script (F1).
@@ -69,7 +75,7 @@ function scan(): DetectedVideo[] {
     );
   }
 
-  return dedupe(found);
+  return dropRedundantNatives(dedupe(found));
 }
 
 let lastSignature = '';

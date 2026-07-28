@@ -63,6 +63,16 @@ export function makeDetected(
   };
 }
 
+/**
+ * When a page has a real YouTube/Vimeo player, native `<video>` elements are
+ * almost always pre-roll ads or the player's internal element — not independent
+ * content. Drop them so the user only sees the actual video.
+ */
+export function dropRedundantNatives(videos: DetectedVideo[]): DetectedVideo[] {
+  const hasEmbed = videos.some((v) => v.provider === 'youtube' || v.provider === 'vimeo');
+  return hasEmbed ? videos.filter((v) => v.provider !== 'native') : videos;
+}
+
 /** De-duplicates by provider + externalId, keeping the first occurrence. */
 export function dedupe(videos: DetectedVideo[]): DetectedVideo[] {
   const seen = new Set<string>();

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { providerFromUrl, externalIdFromUrl, dedupe, makeDetected } from './detect';
+import {
+  providerFromUrl,
+  externalIdFromUrl,
+  dedupe,
+  makeDetected,
+  dropRedundantNatives,
+} from './detect';
 
 describe('providerFromUrl', () => {
   it('recognizes YouTube hosts', () => {
@@ -29,6 +35,23 @@ describe('externalIdFromUrl', () => {
   });
   it('extracts Vimeo id', () => {
     expect(externalIdFromUrl('https://player.vimeo.com/video/76979871', 'vimeo')).toBe('76979871');
+  });
+});
+
+describe('dropRedundantNatives', () => {
+  it('drops native videos (ads) when a YouTube/Vimeo player is present', () => {
+    const videos = [
+      makeDetected({ provider: 'native', duration: 15 }),
+      makeDetected({ provider: 'youtube', externalId: 'abc' }),
+    ];
+    const out = dropRedundantNatives(videos);
+    expect(out).toHaveLength(1);
+    expect(out[0].provider).toBe('youtube');
+  });
+
+  it('keeps native videos when there is no embed', () => {
+    const videos = [makeDetected({ provider: 'native' })];
+    expect(dropRedundantNatives(videos)).toHaveLength(1);
   });
 });
 
