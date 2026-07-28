@@ -13,7 +13,7 @@ export interface MediaCandidate {
   kind: MediaKind;
 }
 
-const VIMEO_MASTER = /\/master\.json(\?|$)/i;
+const VIMEO_MASTER = /\/(?:master|playlist)\.(?:json|mpd)(\?|$)/i;
 const HLS = /\.m3u8(\?|$)/i;
 const DASH = /\.mpd(\?|$)/i;
 const PROGRESSIVE = /\.mp4(\?|$)/i;

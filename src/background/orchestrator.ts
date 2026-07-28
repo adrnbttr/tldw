@@ -166,7 +166,7 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
       videoId: video.id,
       code,
       message: messageFor(err),
-      detail: detail?.slice(0, 300),
+      detail: detail?.slice(0, 600),
     };
     jobs.set(video.id, state);
     broadcast(state);

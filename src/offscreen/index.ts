@@ -70,7 +70,7 @@ async function runJob(job: TranscribeJob): Promise<void> {
     // Carry the technical detail (ffmpeg/API) + source diagnostics so the popup
     // can show exactly what the host served.
     const base = err instanceof TldwError ? (err.providerMessage ?? '') : String(err);
-    const detail = [base, diag.join(' ')].filter(Boolean).join(' ‹ ');
+    const detail = [diag.join(' '), base].filter(Boolean).join(' ‹ ');
     console.error('[tldw] audio fallback failed', { code, detail, sources: job.sources });
     report({ type: 'OFFSCREEN_RESULT', videoId: job.videoId, ok: false, code, message: detail });
   }
@@ -162,11 +162,27 @@ async function downloadSource(
   diag: string[],
 ): Promise<Uint8Array> {
   const best = pickBestCandidate(job.sources);
-  diag.push(`captured=[${job.sources.map((s) => s.kind).join(',') || 'none'}]`);
+
+  // Compact diagnostics (most useful first, so it survives truncation).
+  const counts: Record<string, number> = {};
+  for (const s of job.sources) counts[s.kind] = (counts[s.kind] ?? 0) + 1;
+  const sample = job.sources.find((s) => s.kind !== 'segment') ?? job.sources[0];
+  if (sample) diag.push(`sample=${sample.kind}:${safePath(sample.url)}`);
+  diag.push(
+    `kinds=${
+      Object.entries(counts)
+        .map(([k, n]) => `${k}×${n}`)
+        .join(',') || 'none'
+    }`,
+  );
+  console.log(
+    '[tldw] captured sources',
+    job.sources.map((s) => `${s.kind} ${safePath(s.url)}`),
+  );
+
   if (!best) {
     throw new TldwError('MEDIA_NOT_CAPTURABLE', 'No media source was captured.');
   }
-  diag.push(`chosen=${best.kind}:${safePath(best.url)}`);
 
   progress(t.fetchingMedia);
 
