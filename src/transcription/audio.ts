@@ -1,16 +1,20 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { fetchFile } from '@ffmpeg/util';
 import { TldwError } from '@/types';
 
 /**
  * Audio extraction with ffmpeg.wasm (F5.3).
  *
- * Runs inside the offscreen document (the service worker has no DOM). The core is
- * self-hosted from `public/ffmpeg` and loaded via same-origin blob URLs — the
- * single-threaded build avoids SharedArrayBuffer / COOP-COEP requirements.
+ * Runs inside the offscreen document (the service worker has no DOM).
+ *
+ * Loading under the extension CSP (`script-src 'self' 'wasm-unsafe-eval'`): the
+ * class worker is the module worker Vite bundles for us (same-origin, so it passes
+ * CSP — a blob: worker would not). The single-threaded ESM core is self-hosted in
+ * `public/ffmpeg` and loaded from its same-origin chrome-extension:// URL via the
+ * worker's dynamic import(); no SharedArrayBuffer, so no COOP/COEP needed.
  *
  * Strategy: decode the source once into a compact mono 16 kHz MP3, then slice that
- * MP3 per chunk (cheap, no re-decode). Output stays small enough for Whisper.
+ * MP3 per chunk (cheap, no re-decode).
  */
 
 const AUDIO_BITRATE_KBPS = 64;
@@ -20,20 +24,33 @@ export const AUDIO_BYTES_PER_SECOND = (AUDIO_BITRATE_KBPS * 1000) / 8;
 export class FfmpegAudio {
   private ffmpeg = new FFmpeg();
   private loaded = false;
+  /** Last few ffmpeg log lines, surfaced on failure for diagnosis. */
+  private log: string[] = [];
 
   async load(): Promise<void> {
     if (this.loaded) return;
     const base = chrome.runtime.getURL('ffmpeg');
+    this.ffmpeg.on('log', ({ message }) => {
+      this.log.push(message);
+      if (this.log.length > 12) this.log.shift();
+      console.debug('[tldw ffmpeg]', message);
+    });
     try {
+      // No classWorkerURL → use the module worker Vite bundled (same-origin, CSP-ok).
       await this.ffmpeg.load({
-        coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
-        classWorkerURL: await toBlobURL(`${base}/814.ffmpeg.js`, 'text/javascript'),
+        coreURL: `${base}/ffmpeg-core.js`,
+        wasmURL: `${base}/ffmpeg-core.wasm`,
       });
       this.loaded = true;
     } catch (err) {
+      console.error('[tldw] ffmpeg failed to load', err);
       throw new TldwError('AUDIO_EXTRACTION_FAILED', 'Failed to load ffmpeg.wasm.', String(err));
     }
+  }
+
+  /** Recent ffmpeg log lines (for error diagnosis). */
+  private tail(): string {
+    return this.log.slice(-4).join(' | ');
   }
 
   /** Decodes an arbitrary media input into a full mono 16 kHz MP3. */
@@ -56,10 +73,17 @@ export class FfmpegAudio {
         'output.mp3',
       ]);
       const out = await this.ffmpeg.readFile('output.mp3');
+      if (!out || (out as Uint8Array).byteLength === 0) {
+        throw new Error('empty output — the input had no decodable audio track');
+      }
       await this.cleanup([inputName, 'output.mp3']);
       return out as Uint8Array;
     } catch (err) {
-      throw new TldwError('AUDIO_EXTRACTION_FAILED', 'Audio extraction failed.', String(err));
+      throw new TldwError(
+        'AUDIO_EXTRACTION_FAILED',
+        'Audio extraction failed.',
+        `${err} ${this.tail()}`.trim(),
+      );
     }
   }
 
@@ -85,7 +109,11 @@ export class FfmpegAudio {
       await this.cleanup([inName, outName]);
       return data;
     } catch (err) {
-      throw new TldwError('AUDIO_EXTRACTION_FAILED', 'Audio slicing failed.', String(err));
+      throw new TldwError(
+        'AUDIO_EXTRACTION_FAILED',
+        'Audio slicing failed.',
+        `${err} ${this.tail()}`.trim(),
+      );
     }
   }
 

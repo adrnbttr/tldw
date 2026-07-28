@@ -9,10 +9,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = join(root, 'public', 'ffmpeg');
 mkdirSync(out, { recursive: true });
 
+// ESM core: the class worker (bundled by Vite) loads it via dynamic import(),
+// which works from a same-origin chrome-extension:// URL under the extension CSP.
 const files = [
-  ['node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.js', 'ffmpeg-core.js'],
-  ['node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm', 'ffmpeg-core.wasm'],
-  ['node_modules/@ffmpeg/ffmpeg/dist/umd/814.ffmpeg.js', '814.ffmpeg.js'],
+  ['node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.js', 'ffmpeg-core.js'],
+  ['node_modules/@ffmpeg/core/dist/esm/ffmpeg-core.wasm', 'ffmpeg-core.wasm'],
 ];
 
 for (const [from, to] of files) {
