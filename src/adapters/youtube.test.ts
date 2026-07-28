@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractPlayerResponse, pickTrack } from './youtube';
+import { extractPlayerResponse, pickTrack, parseXmlTimedtext } from './youtube';
 
 describe('extractPlayerResponse', () => {
   it('extracts the JSON blob with nested braces and strings', () => {
@@ -10,6 +10,18 @@ describe('extractPlayerResponse', () => {
 
   it('returns null when absent', () => {
     expect(extractPlayerResponse('<html></html>')).toBeNull();
+  });
+});
+
+describe('parseXmlTimedtext', () => {
+  it('parses <text> cues and decodes entities', () => {
+    const xml =
+      '<transcript><text start="0" dur="4.2">Bonjour &amp; bienvenue</text>' +
+      '<text start="4.2" dur="2">C&#39;est parti</text></transcript>';
+    const segs = parseXmlTimedtext(xml);
+    expect(segs).toHaveLength(2);
+    expect(segs[0]).toMatchObject({ start: 0, end: 4.2, text: 'Bonjour & bienvenue' });
+    expect(segs[1].text).toBe("C'est parti");
   });
 });
 

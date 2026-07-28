@@ -183,26 +183,42 @@ async function fetchTrackSegments(
   signal?: AbortSignal,
 ): Promise<TranscriptSegment[]> {
   if (!track?.baseUrl) return [];
-  const url = new URL(track.baseUrl);
-  url.searchParams.set('fmt', 'json3');
-  const res = await fetch(url.toString(), { credentials: 'include', signal });
-  diag.push(`track=${res.status}`);
-  if (!res.ok) {
-    throw new TldwError(
-      'NO_CAPTIONS_AVAILABLE',
-      `Track fetch returned ${res.status}.`,
-      diag.join(' '),
-    );
+  // json3 (best — has timings) then the default XML, which YouTube serves when
+  // json3 comes back empty. Anonymous (no cookies) is how timedtext expects it.
+  const json3 = await fetchTimedtext(track.baseUrl, 'json3', diag, signal);
+  if (json3.length > 0) return json3;
+  return fetchTimedtext(track.baseUrl, '', diag, signal);
+}
+
+async function fetchTimedtext(
+  baseUrl: string,
+  fmt: string,
+  diag: string[],
+  signal?: AbortSignal,
+): Promise<TranscriptSegment[]> {
+  const url = new URL(baseUrl);
+  if (fmt) url.searchParams.set('fmt', fmt);
+  else url.searchParams.delete('fmt');
+
+  const res = await fetch(url.toString(), { credentials: 'omit', signal });
+  const label = fmt || 'xml';
+  diag.push(`tt(${label})=${res.status}`);
+  if (!res.ok) return [];
+  const raw = (await res.text()).trim();
+  if (!raw) {
+    diag.push(`tt(${label})-empty`);
+    return [];
   }
-  const raw = await res.text();
+  return fmt === 'json3' ? json3ToSegments(raw) : parseXmlTimedtext(raw);
+}
+
+function json3ToSegments(raw: string): TranscriptSegment[] {
   let data: { events?: Json3Event[] };
   try {
     data = JSON.parse(raw) as { events?: Json3Event[] };
   } catch {
-    diag.push(`track-nonjson len=${raw.length}`);
     return [];
   }
-
   const segments: TranscriptSegment[] = [];
   for (const ev of data.events ?? []) {
     const text = (ev.segs ?? [])
@@ -212,10 +228,35 @@ async function fetchTrackSegments(
       .trim();
     if (!text) continue;
     const start = (ev.tStartMs ?? 0) / 1000;
-    const end = start + (ev.dDurationMs ?? 0) / 1000;
-    segments.push({ start, end, text });
+    segments.push({ start, end: start + (ev.dDurationMs ?? 0) / 1000, text });
   }
   return segments;
+}
+
+/** Parses the classic `<transcript><text start dur>...</text></transcript>`. */
+export function parseXmlTimedtext(xml: string): TranscriptSegment[] {
+  const segments: TranscriptSegment[] = [];
+  const re = /<text\b([^>]*)>([\s\S]*?)<\/text>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml)) !== null) {
+    const start = Number(m[1].match(/\bstart="([\d.]+)"/)?.[1] ?? NaN);
+    const dur = Number(m[1].match(/\bdur="([\d.]+)"/)?.[1] ?? 0);
+    const text = decodeEntities(m[2]).replace(/\s+/g, ' ').trim();
+    if (text && Number.isFinite(start)) segments.push({ start, end: start + dur, text });
+  }
+  return segments;
+}
+
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ');
 }
 
 function normalize(
