@@ -12,7 +12,7 @@ tldw — Video Summaries
 ## Summary (max 132 characters)
 
 ```
-Turn embedded YouTube & Vimeo videos into structured Markdown summaries. Your own API keys, no backend, nothing tracked.
+Summarize any web video — YouTube, Vimeo, or native HTML5 — into structured Markdown. Your own API keys, no backend.
 ```
 
 ## Category
@@ -31,7 +31,7 @@ tldw turns the videos embedded on a page into a clean, structured summary you ca
 read in a minute and download as Markdown.
 
 HOW IT WORKS
-1. Open a page with a YouTube or Vimeo video.
+1. Open a page with a video (YouTube, Vimeo, or a native HTML5 player).
 2. Click tldw — it lists the videos it detected.
 3. Hit "Summarize". tldw gets the spoken content (captions first, an audio
    transcription fallback when there are none) and generates a structured summary.

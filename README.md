@@ -4,7 +4,7 @@
 
 <br/>
 
-**A Manifest V3 browser extension that turns embedded YouTube &amp; Vimeo videos into structured Markdown summaries — even behind authentication.**
+**A Manifest V3 browser extension that turns the videos on a page — YouTube, Vimeo, or any native HTML5 `<video>` — into structured Markdown summaries, even behind a login.**
 
 Runs entirely in your browser, with your own API keys. No backend. No subscription. No tracking.
 

@@ -1,7 +1,7 @@
 {
   "name": "tldw",
   "version": "0.1.0",
-  "description": "Browser extension that turns embedded YouTube and Vimeo videos into structured Markdown summaries — even behind authentication.",
+  "description": "Browser extension that turns web videos — YouTube, Vimeo, or any native HTML5 video — into structured Markdown summaries, even behind a login. Your own API keys, no backend.",
   "license": "MIT",
   "type": "module",
   "private": true,

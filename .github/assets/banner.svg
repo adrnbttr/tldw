@@ -26,7 +26,7 @@
   <rect x="82" y="172" width="230" height="6" rx="3" fill="url(#accent)"/>
 
   <text x="84" y="220" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="27" fill="#c7d2fe" font-weight="500">too long; didn&#39;t watch</text>
-  <text x="84" y="258" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="19" fill="#8b90c0">Turn embedded YouTube &amp; Vimeo videos into structured Markdown summaries.</text>
+  <text x="84" y="258" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="19" fill="#8b90c0">Turn YouTube, Vimeo &amp; native web videos into structured Markdown summaries.</text>
 
   <!-- pipeline pills -->
   <g font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="16" font-weight="600">
