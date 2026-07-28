@@ -160,8 +160,8 @@ Open the popup → **⚙️ Settings**:
 
 | Setting | Purpose |
 |---|---|
-| **OpenRouter API key** | Summary generation. Grab one at [openrouter.ai/keys](https://openrouter.ai/keys). |
-| **Transcription API key** | Audio fallback only (Phase 3). |
+| **OpenRouter API key** | Summary generation (the text LLM). Grab one at [openrouter.ai/keys](https://openrouter.ai/keys). |
+| **Transcription API key** | Only for the audio fallback (videos without captions). An **OpenAI** key for Whisper — [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Separate from OpenRouter. |
 | **Summary model** | `Claude Sonnet` (recommended for format fidelity) or `Gemini Flash` for very long transcripts. |
 | **Interface language** | English · Français · Español · Deutsch (applies instantly). |
 | **Summary language / detail level** | Language of the generated summary, and how concise it is. |

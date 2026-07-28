@@ -43,7 +43,7 @@ export const es: Messages = {
     back: '← Atrás',
     heading: 'Ajustes',
     openRouterKey: 'Clave API de OpenRouter',
-    transcriptionKey: 'Clave API de transcripción (respaldo de audio)',
+    transcriptionKey: 'Clave de transcripción — OpenAI (Whisper), para el respaldo de audio',
     transcriptionPlaceholder: 'opcional',
     model: 'Modelo de resumen',
     outputLanguage: 'Idioma del resumen',

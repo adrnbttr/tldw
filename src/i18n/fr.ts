@@ -43,7 +43,7 @@ export const fr: Messages = {
     back: '← Retour',
     heading: 'Paramètres',
     openRouterKey: 'Clé API OpenRouter',
-    transcriptionKey: 'Clé API transcription (fallback audio)',
+    transcriptionKey: 'Clé de transcription — OpenAI (Whisper), pour le fallback audio',
     transcriptionPlaceholder: 'optionnelle',
     model: 'Modèle de résumé',
     outputLanguage: 'Langue du résumé',
