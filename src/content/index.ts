@@ -1,4 +1,4 @@
-import type { ContentMessage, DetectedVideo, PrimeMediaMessage } from '@/types';
+import type { ContentMessage, ContentInbound, DetectedVideo } from '@/types';
 import {
   dedupe,
   dropRedundantNatives,
@@ -171,10 +171,23 @@ function primeMedia(video: DetectedVideo): void {
   }
 }
 
-chrome.runtime.onMessage.addListener((message: PrimeMediaMessage) => {
-  if (message.type === 'PRIME_MEDIA') primeMedia(message.video);
-  return false;
-});
+chrome.runtime.onMessage.addListener(
+  (message: ContentInbound, _sender, sendResponse: (r: { text: string }) => void) => {
+    if (message.type === 'PRIME_MEDIA') {
+      primeMedia(message.video);
+      return false;
+    }
+    if (message.type === 'FETCH_TEXT') {
+      // Same-origin fetch from the page context (correct referer/cookies).
+      fetch(message.url, { credentials: 'include' })
+        .then((r) => (r.ok ? r.text() : ''))
+        .then((text) => sendResponse({ text }))
+        .catch(() => sendResponse({ text: '' }));
+      return true; // async response
+    }
+    return false;
+  },
+);
 
 publish();
 

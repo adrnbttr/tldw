@@ -1,5 +1,6 @@
 import type { DetectedVideo, Transcript, TranscriptSegment } from '@/types';
 import { TldwError, buildFullText } from '@/types';
+import { fetchTextViaPage } from '@/background/page-fetch';
 import type { Adapter } from './types';
 
 /**
@@ -200,11 +201,20 @@ async function fetchTimedtext(
   if (fmt) url.searchParams.set('fmt', fmt);
   else url.searchParams.delete('fmt');
 
-  const res = await fetch(url.toString(), { credentials: 'omit', signal });
   const label = fmt || 'xml';
+  const res = await fetch(url.toString(), { credentials: 'omit', signal });
   diag.push(`tt(${label})=${res.status}`);
-  if (!res.ok) return [];
-  const raw = (await res.text()).trim();
+  let raw = res.ok ? (await res.text()).trim() : '';
+
+  // YouTube serves empty timedtext to the service worker — retry from the page.
+  if (!raw) {
+    const viaPage = (await fetchTextViaPage(url.toString()))?.trim() ?? '';
+    if (viaPage) {
+      diag.push(`tt(${label})-viapage`);
+      raw = viaPage;
+    }
+  }
+
   if (!raw) {
     diag.push(`tt(${label})-empty`);
     return [];

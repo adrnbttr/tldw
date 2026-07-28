@@ -95,3 +95,9 @@ export type ContentMessage = { type: 'VIDEOS_DETECTED'; videos: DetectedVideo[] 
 
 /** background → content: briefly play a video (muted) to trigger media capture. */
 export type PrimeMediaMessage = { type: 'PRIME_MEDIA'; video: DetectedVideo };
+
+/** background → content: fetch a URL from the page's own origin (e.g. YouTube
+ * captions, which are only served to the youtube.com page context). */
+export type FetchTextMessage = { type: 'FETCH_TEXT'; url: string };
+
+export type ContentInbound = PrimeMediaMessage | FetchTextMessage;
