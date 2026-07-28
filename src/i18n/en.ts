@@ -80,6 +80,8 @@ export const en: Messages = {
     NO_VIDEO_DETECTED: 'No video found on this page. Start playback, then try again.',
     NO_CAPTIONS_AVAILABLE:
       'This video has no captions and audio transcription is not configured. Add a transcription key in the settings.',
+    CAPTIONS_BLOCKED:
+      'YouTube is currently blocking caption downloads for this video — a YouTube restriction, not a tldw bug.',
     MISSING_OPENROUTER_KEY: 'OpenRouter key missing. Add it in the settings.',
     MISSING_TRANSCRIPTION_KEY:
       'Transcription key missing. Add it in the settings to enable the audio fallback.',

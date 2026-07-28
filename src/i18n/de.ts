@@ -81,6 +81,8 @@ export const de: Messages = {
       'Kein Video auf dieser Seite gefunden. Starte die Wiedergabe und versuche es erneut.',
     NO_CAPTIONS_AVAILABLE:
       'Dieses Video hat keine Untertitel und die Audio-Transkription ist nicht eingerichtet. Füge in den Einstellungen einen Transkriptionsschlüssel hinzu.',
+    CAPTIONS_BLOCKED:
+      'YouTube blockiert derzeit den Untertitel-Download für dieses Video — eine YouTube-Einschränkung, kein tldw-Fehler.',
     MISSING_OPENROUTER_KEY: 'OpenRouter-Schlüssel fehlt. Füge ihn in den Einstellungen hinzu.',
     MISSING_TRANSCRIPTION_KEY:
       'Transkriptionsschlüssel fehlt. Füge ihn in den Einstellungen hinzu, um den Audio-Fallback zu aktivieren.',

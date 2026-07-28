@@ -81,6 +81,8 @@ export const es: Messages = {
       'No se encontró ningún vídeo en esta página. Inicia la reproducción e inténtalo de nuevo.',
     NO_CAPTIONS_AVAILABLE:
       'Este vídeo no tiene subtítulos y la transcripción de audio no está configurada. Añade una clave de transcripción en los ajustes.',
+    CAPTIONS_BLOCKED:
+      'YouTube está bloqueando la descarga de subtítulos de este vídeo — una restricción de YouTube, no un error de tldw.',
     MISSING_OPENROUTER_KEY: 'Falta la clave de OpenRouter. Añádela en los ajustes.',
     MISSING_TRANSCRIPTION_KEY:
       'Falta la clave de transcripción. Añádela en los ajustes para activar el respaldo de audio.',

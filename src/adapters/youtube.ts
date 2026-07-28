@@ -39,7 +39,13 @@ export const youtubeAdapter: Adapter = {
       diag.push(`picked=${track?.languageCode ?? '?'} base=${track?.baseUrl ? 'y' : 'NO'}`);
       const segments = await fetchTrackSegments(track, diag, signal);
       if (segments.length === 0) {
-        throw new TldwError('NO_CAPTIONS_AVAILABLE', 'Empty caption track.', diag.join(' '));
+        // A track exists but its content came back empty everywhere → YouTube is
+        // gating it behind a proof-of-origin token.
+        throw new TldwError(
+          'CAPTIONS_BLOCKED',
+          'Caption content blocked by YouTube.',
+          diag.join(' '),
+        );
       }
 
       return normalize(video, track.languageCode, segments);

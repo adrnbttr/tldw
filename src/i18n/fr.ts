@@ -80,6 +80,8 @@ export const fr: Messages = {
     NO_VIDEO_DETECTED: 'Aucune vidéo trouvée sur cette page. Lancez la lecture puis réessayez.',
     NO_CAPTIONS_AVAILABLE:
       "Cette vidéo n'a pas de sous-titres et la transcription audio n'est pas configurée. Ajoutez une clé de transcription dans les paramètres.",
+    CAPTIONS_BLOCKED:
+      'YouTube bloque actuellement le téléchargement des sous-titres de cette vidéo — une restriction de YouTube, pas un bug de tldw.',
     MISSING_OPENROUTER_KEY: 'Clé OpenRouter manquante. Renseignez-la dans les paramètres.',
     MISSING_TRANSCRIPTION_KEY:
       'Clé de transcription manquante. Renseignez-la dans les paramètres pour activer le fallback audio.',
