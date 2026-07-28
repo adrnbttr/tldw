@@ -54,11 +54,11 @@ Because two summaries from two different extraction paths must read the same, th
 - 🌍 **Any DRM-free video** — YouTube/Vimeo captions when available, and for everything else (native `<video>` on course platforms, etc.) an audio-transcription fallback. Not just the big two hosts.
 - 🌐 **Multilingual UI** — English, Français, Español, Deutsch; pick the interface *and* the summary language independently.
 - 🔐 **Works behind authentication** — extraction runs in the tab's own session context.
-- 🪜 **Best-effort cascade** — captions first, audio transcription as a fallback (`ffmpeg.wasm` + Whisper), then an explicit typed error. Never a silent failure.
+- 🪜 **Best-effort cascade** — captions first, audio transcription as a fallback (`ffmpeg.wasm` + Gemini/Whisper), then an explicit typed error. Never a silent failure.
 - 📐 **Identical output every time** — structured JSON → local Markdown rendering from a versioned template.
 - 🧠 **Bring your own model** — Gemini Flash (best value) or Claude Sonnet via OpenRouter, with a hierarchical strategy for very long transcripts.
 - 💳 **One provider by default** — audio transcription runs through OpenRouter (Gemini) too, so a single API key covers everything; OpenAI Whisper stays optional.
-- 💾 **Export, history &amp; batch** — one-click `.md` download, clipboard copy, a browsable local history, and multi-video batch processing into a single file.
+- 📄 **PDF &amp; Word export** — one-click, nicely formatted **PDF** or **Word (.docx)**, plus clean-text copy, a browsable local history, and multi-video batch processing into a single PDF.
 - 🎨 **Selectable templates** — `default` (full) or `compact`, chosen in Settings.
 - 🔒 **Private by design** — keys live in `chrome.storage.local` and are only ever sent to the provider they belong to.
 
@@ -187,7 +187,8 @@ Keys are stored locally and never leave your browser except toward the provider 
 | Audio | `ffmpeg.wasm` (single-threaded core) in an offscreen document |
 | Tests | Vitest |
 | Quality | ESLint + Prettier, GitHub Actions CI |
-| APIs | OpenRouter (summaries) · Whisper (audio fallback) |
+| APIs | OpenRouter (summaries + audio transcription) · OpenAI Whisper (optional) |
+| Export | PDF (`jsPDF`) · Word (`docx`) |
 
 ## Project structure
 
@@ -225,7 +226,7 @@ Security reports: [`SECURITY.md`](./SECURITY.md).
 
 - [x] **Phase 1** — detection, YouTube adapter, OpenRouter summary, popup, export
 - [x] **Phase 2** — Vimeo adapter (level 1: `text_tracks`)
-- [x] **Phase 3** 🧪 — audio transcription fallback (`ffmpeg.wasm` + Whisper, in an offscreen document) — *implemented, pending validation on a real stream*
+- [x] **Phase 3** — audio transcription fallback (`ffmpeg.wasm` + Gemini/Whisper, in an offscreen document); reconstructs Vimeo DASH audio and transcribes it. *Validated on real private, captionless Vimeo.*
 - [x] **Phase 4** — batch processing, history browser, multiple templates, quota handling
 
 Detailed roadmap in [`docs/ROADMAP.md`](./docs/ROADMAP.md).

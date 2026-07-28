@@ -3,6 +3,7 @@ import {
   dedupe,
   dropRedundantNatives,
   externalIdFromUrl,
+  keepFirstOfProvider,
   makeDetected,
   pageVideoFromUrl,
   providerFromUrl,
@@ -97,7 +98,9 @@ function scan(): DetectedVideo[] {
     );
   }
 
-  return dropRedundantNatives(dedupe(found));
+  const videos = dropRedundantNatives(dedupe(found));
+  // On a watch page, the page-URL video is authoritative for its provider.
+  return page ? keepFirstOfProvider(videos, page.provider) : videos;
 }
 
 let lastSignature = '';

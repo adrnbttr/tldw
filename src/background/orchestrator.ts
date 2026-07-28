@@ -195,6 +195,9 @@ async function extract(
     } catch (err) {
       if (!(err instanceof TldwError) || err.code !== 'NO_CAPTIONS_AVAILABLE') throw err;
       setStep('captions', 'failed');
+      // YouTube media (googlevideo, signed URLs) can't be captured, so the audio
+      // fallback is futile — surface the caption failure with its diagnostic.
+      if (video.provider === 'youtube') throw err;
     }
   } else {
     // Native <video> / no caption source: skip straight to the audio fallback.

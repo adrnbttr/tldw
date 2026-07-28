@@ -27,15 +27,20 @@ export const youtubeAdapter: Adapter = {
   },
 
   async extractCaptions(video, signal) {
-    const tracks = await fetchCaptionTracks(video.externalId, signal);
+    const diag: string[] = [];
+    const tracks = await fetchCaptionTracks(video.externalId, diag, signal);
     if (tracks.length === 0) {
-      throw new TldwError('NO_CAPTIONS_AVAILABLE', 'No caption tracks for this video.');
+      throw new TldwError(
+        'NO_CAPTIONS_AVAILABLE',
+        'No caption tracks for this video.',
+        diag.join(' '),
+      );
     }
 
     const track = pickTrack(tracks);
     const segments = await fetchTrackSegments(track, signal);
     if (segments.length === 0) {
-      throw new TldwError('NO_CAPTIONS_AVAILABLE', 'Caption track was empty.');
+      throw new TldwError('NO_CAPTIONS_AVAILABLE', 'Caption track was empty.', diag.join(' '));
     }
 
     return normalize(video, track.languageCode, segments);
@@ -45,19 +50,34 @@ export const youtubeAdapter: Adapter = {
 // Public "WEB" InnerTube key — stable and used by the site itself.
 const INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
 
-async function fetchCaptionTracks(videoId: string, signal?: AbortSignal): Promise<CaptionTrack[]> {
+async function fetchCaptionTracks(
+  videoId: string,
+  diag: string[],
+  signal?: AbortSignal,
+): Promise<CaptionTrack[]> {
   // InnerTube first (reliable JSON API), then scrape the watch page as a fallback.
-  const viaApi = await fetchViaInnertube(videoId, signal).catch(() => []);
+  // credentials:'include' reuses the user's YouTube session so no consent wall.
+  const viaApi = await fetchViaInnertube(videoId, diag, signal).catch((e) => {
+    diag.push(`innertube-err=${e}`);
+    return [];
+  });
   if (viaApi.length > 0) return viaApi;
-  return fetchViaWatchPage(videoId, signal).catch(() => []);
+  return fetchViaWatchPage(videoId, diag, signal).catch((e) => {
+    diag.push(`watch-err=${e}`);
+    return [];
+  });
 }
 
 /** YouTube's internal player API — avoids the fragile HTML scrape / consent wall. */
-async function fetchViaInnertube(videoId: string, signal?: AbortSignal): Promise<CaptionTrack[]> {
+async function fetchViaInnertube(
+  videoId: string,
+  diag: string[],
+  signal?: AbortSignal,
+): Promise<CaptionTrack[]> {
   const res = await fetch(`https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'omit',
+    credentials: 'include',
     body: JSON.stringify({
       videoId,
       context: {
@@ -66,19 +86,29 @@ async function fetchViaInnertube(videoId: string, signal?: AbortSignal): Promise
     }),
     signal,
   });
+  diag.push(`innertube=${res.status}`);
   if (!res.ok) return [];
-  const data = (await res.json()) as PlayerResponse;
-  return data.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  const data = (await res.json()) as PlayerResponse & { playabilityStatus?: { status?: string } };
+  const tracks = data.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  diag.push(`play=${data.playabilityStatus?.status ?? '?'} tracks=${tracks.length}`);
+  return tracks;
 }
 
-async function fetchViaWatchPage(videoId: string, signal?: AbortSignal): Promise<CaptionTrack[]> {
+async function fetchViaWatchPage(
+  videoId: string,
+  diag: string[],
+  signal?: AbortSignal,
+): Promise<CaptionTrack[]> {
   const res = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=en`, {
-    credentials: 'omit',
+    credentials: 'include',
     signal,
   });
+  diag.push(`watch=${res.status}`);
   if (!res.ok) return [];
   const player = extractPlayerResponse(await res.text());
-  return player?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  const tracks = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  diag.push(`watch-tracks=${tracks.length}`);
+  return tracks;
 }
 
 interface PlayerResponse {

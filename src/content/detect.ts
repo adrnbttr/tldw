@@ -101,6 +101,21 @@ export function dropRedundantNatives(videos: DetectedVideo[]): DetectedVideo[] {
   return hasEmbed ? videos.filter((v) => v.provider !== 'native') : videos;
 }
 
+/**
+ * On a provider's own watch page, the page-URL video is authoritative: keep only
+ * the first entry of that provider and drop the rest (other iframes on the page are
+ * ads, related videos, or a miniplayer of the same clip).
+ */
+export function keepFirstOfProvider(videos: DetectedVideo[], provider: Provider): DetectedVideo[] {
+  let kept = false;
+  return videos.filter((v) => {
+    if (v.provider !== provider) return true;
+    if (kept) return false;
+    kept = true;
+    return true;
+  });
+}
+
 /** De-duplicates by provider + externalId, keeping the first occurrence. */
 export function dedupe(videos: DetectedVideo[]): DetectedVideo[] {
   const seen = new Set<string>();

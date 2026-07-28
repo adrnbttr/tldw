@@ -22,7 +22,7 @@ embedded in an authenticated page.
 - [x] Vimeo detection & `text_tracks` retrieval (F4)
 - [x] Clean fallthrough to a typed error when no track exists
 
-## Phase 3 — Audio transcription fallback 🧪 (implemented, pending real-stream validation)
+## Phase 3 — Audio transcription fallback ✅ (validated on real Vimeo)
 
 The most delicate part, isolated behind the `Transcriber` interface and run in an
 offscreen document (the service worker has no DOM).
@@ -34,10 +34,9 @@ offscreen document (the service worker has no DOM).
 - [x] Sequential transcription + reassembly/de-duplication (F5.5)
 - [x] Temp-file cleanup, incl. on error
 - [x] Configurable global timeout (default 15 min)
-- [ ] **End-to-end validation against a real DRM-free stream** — the pipeline is
-      wired and unit-tested, but ffmpeg.wasm under the extension CSP and live media
-      extraction still need to be confirmed on a real target. Follow
-      [`TESTING.md`](./TESTING.md) §3.
+- [x] **End-to-end validation against a real DRM-free stream** — confirmed on real
+      private, captionless Vimeo: capture → master.json reconstruction → ffmpeg.wasm
+      (under the extension CSP) → Gemini transcription → summary.
 
 **Validation target:** a Vimeo video without captions yields a summary using the
 *same* template.
