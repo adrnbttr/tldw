@@ -42,19 +42,43 @@ export const youtubeAdapter: Adapter = {
   },
 };
 
+// Public "WEB" InnerTube key — stable and used by the site itself.
+const INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+
 async function fetchCaptionTracks(videoId: string, signal?: AbortSignal): Promise<CaptionTrack[]> {
+  // InnerTube first (reliable JSON API), then scrape the watch page as a fallback.
+  const viaApi = await fetchViaInnertube(videoId, signal).catch(() => []);
+  if (viaApi.length > 0) return viaApi;
+  return fetchViaWatchPage(videoId, signal).catch(() => []);
+}
+
+/** YouTube's internal player API — avoids the fragile HTML scrape / consent wall. */
+async function fetchViaInnertube(videoId: string, signal?: AbortSignal): Promise<CaptionTrack[]> {
+  const res = await fetch(`https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'omit',
+    body: JSON.stringify({
+      videoId,
+      context: {
+        client: { clientName: 'WEB', clientVersion: '2.20240726.00.00', hl: 'en' },
+      },
+    }),
+    signal,
+  });
+  if (!res.ok) return [];
+  const data = (await res.json()) as PlayerResponse;
+  return data.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+}
+
+async function fetchViaWatchPage(videoId: string, signal?: AbortSignal): Promise<CaptionTrack[]> {
   const res = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=en`, {
     credentials: 'omit',
     signal,
   });
-  if (!res.ok) {
-    throw new TldwError('NO_CAPTIONS_AVAILABLE', `Watch page returned ${res.status}.`);
-  }
-  const html = await res.text();
-
-  const player = extractPlayerResponse(html);
-  const list = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
-  return list as CaptionTrack[];
+  if (!res.ok) return [];
+  const player = extractPlayerResponse(await res.text());
+  return player?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
 }
 
 interface PlayerResponse {
