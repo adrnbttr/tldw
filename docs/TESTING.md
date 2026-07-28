@@ -22,11 +22,14 @@ Load `dist/` via `chrome://extensions` → **Developer mode** → **Load unpacke
 
 | Key | Needed for | Where |
 |---|---|---|
-| OpenRouter | every summary (Phases 1–4) | <https://openrouter.ai/keys> |
-| Transcription (OpenAI) | the audio fallback only (Phase 3) | <https://platform.openai.com/api-keys> — this is the Whisper key |
+| OpenRouter | everything by default — summaries **and** audio transcription | <https://openrouter.ai/keys> |
+| OpenAI (optional) | only if you switch audio transcription to Whisper | <https://platform.openai.com/api-keys> |
 
-> Tip: fund each provider with a small amount first. A single summary costs a
-> fraction of a cent; a Whisper transcription is ~$0.006/min.
+By default, **Audio transcription** is set to *OpenRouter (Gemini)*, so a single
+OpenRouter key covers the whole extension — no separate transcription account.
+
+> Tip: fund OpenRouter with a small amount first. A summary costs a fraction of a
+> cent; Gemini audio transcription is very cheap too.
 
 ### Where to look when something fails
 

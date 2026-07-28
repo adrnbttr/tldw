@@ -30,8 +30,13 @@ const WHISPER_MODEL = 'whisper-1';
 
 export const audioTranscriber: Transcriber = {
   async transcribe(video, settings, onProgress, signal) {
-    if (!settings.transcriptionKey) {
-      throw new TldwError('MISSING_TRANSCRIPTION_KEY', 'Audio fallback requires a key.');
+    // OpenRouter transcription reuses the summary key; OpenAI/Whisper needs its own.
+    if (settings.transcriptionProvider === 'openrouter') {
+      if (!settings.openRouterKey) {
+        throw new TldwError('MISSING_OPENROUTER_KEY', 'OpenRouter API key is missing.');
+      }
+    } else if (!settings.transcriptionKey) {
+      throw new TldwError('MISSING_TRANSCRIPTION_KEY', 'Whisper requires an OpenAI key.');
     }
 
     const sources = await resolveSources(video);
@@ -48,6 +53,9 @@ export const audioTranscriber: Transcriber = {
       duration: video.duration,
       language: settings.outputLanguage,
       uiLanguage: settings.uiLanguage,
+      transcriptionProvider: settings.transcriptionProvider,
+      openRouterKey: settings.openRouterKey,
+      audioModel: settings.audioModel,
       transcriptionKey: settings.transcriptionKey,
       whisperModel: WHISPER_MODEL,
       sources,

@@ -1,12 +1,24 @@
 import type { DetailLevel } from './summary';
 import type { Locale } from '@/i18n/types';
 
+/**
+ * Which backend transcribes the audio fallback.
+ * - `openrouter`: send audio to a multimodal model via the OpenRouter key (one
+ *   provider to pay — the default).
+ * - `openai`: OpenAI Whisper, needs a separate OpenAI key but gives word timings.
+ */
+export type TranscriptionProvider = 'openrouter' | 'openai';
+
 /** User preferences and secrets, stored in chrome.storage.local (F9). */
 export interface Settings {
-  /** OpenRouter key — used for summary generation only. */
+  /** OpenRouter key — summaries, and audio transcription when provider is openrouter. */
   openRouterKey: string;
-  /** Transcription provider key — used for the audio fallback only. */
+  /** OpenAI key — only used when transcriptionProvider is 'openai' (Whisper). */
   transcriptionKey: string;
+  /** Which backend runs the audio fallback. */
+  transcriptionProvider: TranscriptionProvider;
+  /** OpenRouter multimodal model used to transcribe audio (openrouter provider). */
+  audioModel: string;
   /** OpenRouter model id for summaries. */
   summaryModel: string;
   /** Output language for the summary content and headings. */
@@ -25,7 +37,9 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   openRouterKey: '',
   transcriptionKey: '',
-  summaryModel: 'anthropic/claude-sonnet-4',
+  transcriptionProvider: 'openrouter',
+  audioModel: 'google/gemini-2.5-flash',
+  summaryModel: 'google/gemini-2.5-flash',
   outputLanguage: 'en',
   uiLanguage: 'en',
   detailLevel: 'standard',
@@ -34,8 +48,12 @@ export const DEFAULT_SETTINGS: Settings = {
   historyLimit: 50,
 };
 
-/** OpenRouter models surfaced in Settings (spec §3.7). */
+/**
+ * OpenRouter models surfaced in Settings (spec §3.7). Ordered best value first;
+ * Gemini Flash is the default for its quality/price ratio, Claude Sonnet for
+ * maximum format fidelity.
+ */
 export const AVAILABLE_MODELS: Array<{ id: string; label: string }> = [
-  { id: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4 (recommended)' },
-  { id: 'google/gemini-2.0-flash-001', label: 'Gemini Flash (long transcripts)' },
+  { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (best value)' },
+  { id: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4 (highest fidelity)' },
 ];

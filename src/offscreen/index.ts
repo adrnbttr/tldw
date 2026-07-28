@@ -9,6 +9,7 @@ import { pickBestCandidate, resolveSegmentUrls } from '@/transcription/media';
 import { FfmpegAudio, AUDIO_BYTES_PER_SECOND } from '@/transcription/audio';
 import { planChunks, mergeChunkTranscripts } from '@/transcription/chunker';
 import { transcribeAudio } from '@/transcription/whisper';
+import { transcribeViaOpenRouter } from '@/transcription/openrouter-audio';
 import { getCatalog, isLocale } from '@/i18n';
 import type { Messages } from '@/i18n';
 
@@ -16,8 +17,9 @@ import type { Messages } from '@/i18n';
  * Offscreen document (F5).
  *
  * Runs the full audio-fallback pipeline off the service worker:
- *   resolve media source → download → extract mono MP3 → chunk → Whisper → merge.
- * Progress and the terminal result are posted back to the worker.
+ *   resolve media source → download → extract mono MP3 → chunk → transcribe → merge.
+ * Transcription uses OpenRouter (Gemini) by default, or OpenAI Whisper. Progress
+ * and the terminal result are posted back to the worker.
  */
 
 const audio = new FfmpegAudio();
@@ -45,37 +47,14 @@ async function runJob(job: TranscribeJob): Promise<void> {
 
     progress(t.extractingAudio);
     const mp3 = await audio.toMonoMp3(mediaBytes, 'input.media');
-
     const duration = job.duration ?? estimateDuration(mp3.byteLength);
-    const chunks = planChunks({
-      durationSeconds: duration,
-      bytesPerSecond: AUDIO_BYTES_PER_SECOND,
-    });
 
-    const perChunkSegments: TranscriptSegment[][] = [];
-    const offsets: number[] = [];
-    let language = job.language;
+    const { language, segments } =
+      job.transcriptionProvider === 'openrouter'
+        ? await transcribeWithOpenRouter(job, mp3, duration, t, progress)
+        : await transcribeWithWhisper(job, mp3, duration, t, progress);
 
-    for (const chunk of chunks) {
-      progress(t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)));
-      const slice = chunks.length === 1 ? mp3 : await audio.slice(mp3, chunk.start, chunk.end);
-      const result = await transcribeAudio(
-        new Blob([slice as BlobPart]),
-        `chunk-${chunk.index}.mp3`,
-        {
-          apiKey: job.transcriptionKey,
-          model: job.whisperModel,
-          language: job.language,
-        },
-      );
-      language = result.language || language;
-      perChunkSegments.push(result.segments);
-      offsets.push(chunk.start);
-    }
-
-    const segments = mergeChunkTranscripts(perChunkSegments, offsets);
     audio.terminate();
-
     report({ type: 'OFFSCREEN_RESULT', videoId: job.videoId, ok: true, language, segments });
   } catch (err) {
     audio.terminate();
@@ -88,6 +67,74 @@ async function runJob(job: TranscribeJob): Promise<void> {
       message: messageFor(err),
     });
   }
+}
+
+interface TranscriptResult {
+  language: string;
+  segments: TranscriptSegment[];
+}
+
+/** OpenRouter (Gemini) path: plain-text transcript, no overlap, one segment/chunk. */
+async function transcribeWithOpenRouter(
+  job: TranscribeJob,
+  mp3: Uint8Array,
+  duration: number,
+  t: Messages['transcription'],
+  progress: (detail: string) => void,
+): Promise<TranscriptResult> {
+  const chunks = planChunks({
+    durationSeconds: duration,
+    bytesPerSecond: AUDIO_BYTES_PER_SECOND,
+    overlapSeconds: 0,
+  });
+
+  const segments: TranscriptSegment[] = [];
+  for (const chunk of chunks) {
+    progress(t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)));
+    const slice = chunks.length === 1 ? mp3 : await audio.slice(mp3, chunk.start, chunk.end);
+    const text = await transcribeViaOpenRouter(slice, {
+      apiKey: job.openRouterKey,
+      model: job.audioModel,
+      language: job.language,
+    });
+    if (text) segments.push({ start: chunk.start, end: chunk.end, text });
+  }
+
+  return { language: job.language, segments };
+}
+
+/** OpenAI Whisper path: per-segment timings, overlap, reassembled + de-duplicated. */
+async function transcribeWithWhisper(
+  job: TranscribeJob,
+  mp3: Uint8Array,
+  duration: number,
+  t: Messages['transcription'],
+  progress: (detail: string) => void,
+): Promise<TranscriptResult> {
+  const chunks = planChunks({ durationSeconds: duration, bytesPerSecond: AUDIO_BYTES_PER_SECOND });
+
+  const perChunkSegments: TranscriptSegment[][] = [];
+  const offsets: number[] = [];
+  let language = job.language;
+
+  for (const chunk of chunks) {
+    progress(t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)));
+    const slice = chunks.length === 1 ? mp3 : await audio.slice(mp3, chunk.start, chunk.end);
+    const result = await transcribeAudio(
+      new Blob([slice as BlobPart]),
+      `chunk-${chunk.index}.mp3`,
+      {
+        apiKey: job.transcriptionKey,
+        model: job.whisperModel,
+        language: job.language,
+      },
+    );
+    language = result.language || language;
+    perChunkSegments.push(result.segments);
+    offsets.push(chunk.start);
+  }
+
+  return { language, segments: mergeChunkTranscripts(perChunkSegments, offsets) };
 }
 
 /** Resolves and downloads the best media source into a single byte buffer. */

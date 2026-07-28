@@ -56,7 +56,8 @@ Because two summaries from two different extraction paths must read the same, th
 - 🔐 **Works behind authentication** — extraction runs in the tab's own session context.
 - 🪜 **Best-effort cascade** — captions first, audio transcription as a fallback (`ffmpeg.wasm` + Whisper), then an explicit typed error. Never a silent failure.
 - 📐 **Identical output every time** — structured JSON → local Markdown rendering from a versioned template.
-- 🧠 **Bring your own model** — Claude Sonnet (recommended) or Gemini Flash via OpenRouter, with a hierarchical strategy for very long transcripts.
+- 🧠 **Bring your own model** — Gemini Flash (best value) or Claude Sonnet via OpenRouter, with a hierarchical strategy for very long transcripts.
+- 💳 **One provider by default** — audio transcription runs through OpenRouter (Gemini) too, so a single API key covers everything; OpenAI Whisper stays optional.
 - 💾 **Export, history &amp; batch** — one-click `.md` download, clipboard copy, a browsable local history, and multi-video batch processing into a single file.
 - 🎨 **Selectable templates** — `default` (full) or `compact`, chosen in Settings.
 - 🔒 **Private by design** — keys live in `chrome.storage.local` and are only ever sent to the provider they belong to.
@@ -160,8 +161,8 @@ Open the popup → **⚙️ Settings**:
 
 | Setting | Purpose |
 |---|---|
-| **OpenRouter API key** | Summary generation (the text LLM). Grab one at [openrouter.ai/keys](https://openrouter.ai/keys). |
-| **Transcription API key** | Only for the audio fallback (videos without captions). An **OpenAI** key for Whisper — [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Separate from OpenRouter. |
+| **OpenRouter API key** | Summaries **and** audio transcription by default — a single provider to pay. Grab one at [openrouter.ai/keys](https://openrouter.ai/keys). |
+| **Audio transcription** | For videos without captions. Default: **OpenRouter (Gemini)** — reuses your OpenRouter key, nothing else to set up. Optionally switch to **OpenAI Whisper** (needs a separate [OpenAI key](https://platform.openai.com/api-keys)) for word-level timings. |
 | **Summary model** | `Claude Sonnet` (recommended for format fidelity) or `Gemini Flash` for very long transcripts. |
 | **Interface language** | English · Français · Español · Deutsch (applies instantly). |
 | **Summary language / detail level** | Language of the generated summary, and how concise it is. |

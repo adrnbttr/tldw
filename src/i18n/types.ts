@@ -58,6 +58,9 @@ export interface Messages {
     back: string;
     heading: string;
     openRouterKey: string;
+    transcriptionProvider: string;
+    providerOpenRouter: string;
+    providerOpenAI: string;
     transcriptionKey: string;
     transcriptionPlaceholder: string;
     model: string;

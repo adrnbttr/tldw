@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { DetailLevel, Settings } from '@/types';
+import type { DetailLevel, Settings, TranscriptionProvider } from '@/types';
 import { AVAILABLE_MODELS, DEFAULT_SETTINGS } from '@/types';
 import { getSettings, saveSettings } from '@/storage';
 import { listTemplates } from '@/summarizer/template';
@@ -61,14 +61,32 @@ export function SettingsView({ onClose, onLocaleChange }: Props) {
       </label>
 
       <label class="field">
-        <span>{t.settings.transcriptionKey}</span>
-        <input
-          type="password"
-          value={settings.transcriptionKey}
-          placeholder={t.settings.transcriptionPlaceholder}
-          onInput={(e) => update('transcriptionKey', (e.target as HTMLInputElement).value)}
-        />
+        <span>{t.settings.transcriptionProvider}</span>
+        <select
+          value={settings.transcriptionProvider}
+          onChange={(e) =>
+            update(
+              'transcriptionProvider',
+              (e.target as HTMLSelectElement).value as TranscriptionProvider,
+            )
+          }
+        >
+          <option value="openrouter">{t.settings.providerOpenRouter}</option>
+          <option value="openai">{t.settings.providerOpenAI}</option>
+        </select>
       </label>
+
+      {settings.transcriptionProvider === 'openai' && (
+        <label class="field">
+          <span>{t.settings.transcriptionKey}</span>
+          <input
+            type="password"
+            value={settings.transcriptionKey}
+            placeholder={t.settings.transcriptionPlaceholder}
+            onInput={(e) => update('transcriptionKey', (e.target as HTMLInputElement).value)}
+          />
+        </label>
+      )}
 
       <label class="field">
         <span>{t.settings.model}</span>

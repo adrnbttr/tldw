@@ -8,6 +8,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Single-provider audio transcription.** The audio fallback now transcribes via
+  OpenRouter (Gemini multimodal) by default, so one OpenRouter key covers both
+  summaries and transcription — no separate OpenAI/Whisper account needed. Whisper
+  remains selectable in Settings for word-level timings.
+- **Duration & title for embedded videos.** Cross-origin Vimeo/YouTube embeds now
+  show their real duration and title in the list, enriched from the providers'
+  public oEmbed endpoints (cached, no key).
 - **Internationalization (en/fr/es/de).** Fully localized popup, typed error
   messages, step labels, and summary template headings. Interface language and
   summary-output language are chosen independently; the first run defaults to the

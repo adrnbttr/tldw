@@ -9,6 +9,7 @@ import {
   cancelJob,
 } from './orchestrator';
 import { installMediaCapture } from './media-capture';
+import { enrichVideos } from './enrich';
 
 installMediaCapture();
 
@@ -49,7 +50,10 @@ chrome.runtime.onMessage.addListener(
     if (message.type === 'LIST_VIDEOS') {
       void (async () => {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        const videos = tab?.id != null ? (videosByTab.get(tab.id) ?? []) : [];
+        const cached = tab?.id != null ? (videosByTab.get(tab.id) ?? []) : [];
+        const videos = await enrichVideos(cached);
+        // Keep the enriched copy so later opens are instant.
+        if (tab?.id != null) videosByTab.set(tab.id, videos);
         sendResponse({ ok: true, videos });
       })();
       return true;

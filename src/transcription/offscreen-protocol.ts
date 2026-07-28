@@ -18,6 +18,12 @@ export interface TranscribeJob {
   language: string;
   /** UI language, so offscreen progress messages are localized. */
   uiLanguage: string;
+  /** Which backend transcribes: OpenRouter (Gemini) or OpenAI (Whisper). */
+  transcriptionProvider: 'openrouter' | 'openai';
+  /** OpenRouter key (openrouter provider) + multimodal audio model. */
+  openRouterKey: string;
+  audioModel: string;
+  /** OpenAI key + Whisper model (openai provider). */
   transcriptionKey: string;
   whisperModel: string;
   /** Candidate media sources to try, best-first. */
