@@ -7,6 +7,7 @@ import {
   isHlsMaster,
   pickHlsVariant,
   parseHlsMedia,
+  parseVimeoMaster,
 } from './media';
 
 describe('classifyMedia', () => {
@@ -51,6 +52,48 @@ describe('resolveSegmentUrls', () => {
     ].join('\n');
     const urls = resolveSegmentUrls(playlist, 'https://host/path/index.m3u8');
     expect(urls).toEqual(['https://host/path/seg0.ts', 'https://cdn/seg1.ts']);
+  });
+});
+
+describe('classifyMedia — Vimeo master', () => {
+  it('detects master.json', () => {
+    expect(classifyMedia('https://vod.vimeocdn.com/x/sep/video/y/master.json?base64_init=1')).toBe(
+      'vimeo_master',
+    );
+  });
+});
+
+describe('parseVimeoMaster', () => {
+  const masterUrl = 'https://vod.vimeocdn.com/exp/sep/video/abc/master.json?base64_init=1';
+  const master = {
+    base_url: '../',
+    audio: [
+      {
+        base_url: 'audio/def/chop/',
+        bitrate: 128000,
+        init_segment: 'aGVsbG8=',
+        segments: [{ url: 'segment-1.m4s' }, { url: 'segment-2.m4s' }],
+      },
+      { base_url: 'audio/hi/', bitrate: 256000, init_segment: 'x', segments: [{ url: 's.m4s' }] },
+    ],
+    video: [],
+  };
+
+  it('picks the lowest-bitrate audio and resolves nested base URLs', () => {
+    const plan = parseVimeoMaster(master, masterUrl);
+    expect(plan.initBase64).toBe('aGVsbG8=');
+    // master.json → ../ → audio/def/chop/ → segment-1.m4s
+    expect(plan.segmentUrls[0]).toBe(
+      'https://vod.vimeocdn.com/exp/sep/video/audio/def/chop/segment-1.m4s',
+    );
+    expect(plan.segmentUrls).toHaveLength(2);
+  });
+
+  it('returns empty when there is no rendition', () => {
+    expect(parseVimeoMaster({ audio: [], video: [] }, masterUrl)).toEqual({
+      initBase64: null,
+      segmentUrls: [],
+    });
   });
 });
 

@@ -10,7 +10,9 @@ import {
   isHlsMaster,
   pickHlsVariant,
   parseHlsMedia,
+  parseVimeoMaster,
 } from '@/transcription/media';
+import type { VimeoMaster } from '@/transcription/media';
 import { FfmpegAudio, AUDIO_BYTES_PER_SECOND } from '@/transcription/audio';
 import { planChunks, mergeChunkTranscripts } from '@/transcription/chunker';
 import { transcribeAudio } from '@/transcription/whisper';
@@ -168,6 +170,10 @@ async function downloadSource(
 
   progress(t.fetchingMedia);
 
+  if (best.kind === 'vimeo_master') {
+    return downloadVimeoMaster(best.url, t, progress, diag);
+  }
+
   if (best.kind === 'progressive' || best.kind === 'segment') {
     return fetchBytes(best.url);
   }
@@ -205,6 +211,41 @@ async function downloadSource(
 
   // DASH and anything else are not assembled here.
   throw new TldwError('MEDIA_NOT_CAPTURABLE', `Unsupported media kind: ${best.kind}.`);
+}
+
+/** Reconstructs a playable fMP4 from a Vimeo DASH master.json (init + segments). */
+async function downloadVimeoMaster(
+  masterUrl: string,
+  t: Messages['transcription'],
+  progress: (detail: string) => void,
+  diag: string[],
+): Promise<Uint8Array> {
+  // Force base64_init so the init segment is inlined in the manifest.
+  const url = /base64_init=1/.test(masterUrl)
+    ? masterUrl
+    : masterUrl + (masterUrl.includes('?') ? '&' : '?') + 'base64_init=1';
+
+  const master = (await (await fetchAuth(url)).json()) as VimeoMaster;
+  const { initBase64, segmentUrls } = parseVimeoMaster(master, url);
+  diag.push(`vimeo-master init=${initBase64 ? 'yes' : 'no'} segs=${segmentUrls.length}`);
+
+  if (!initBase64 || segmentUrls.length === 0) {
+    throw new TldwError('MEDIA_NOT_CAPTURABLE', 'master.json had no init/segments.');
+  }
+
+  const parts: Uint8Array[] = [base64ToBytes(initBase64)];
+  for (let i = 0; i < segmentUrls.length; i++) {
+    progress(t.assembling(i + 1, segmentUrls.length));
+    parts.push(await fetchBytes(segmentUrls[i]));
+  }
+  return concat(parts);
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 async function fetchAuth(url: string): Promise<Response> {

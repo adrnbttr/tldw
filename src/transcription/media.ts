@@ -6,19 +6,21 @@
  * fallback knows what it is dealing with.
  */
 
-export type MediaKind = 'hls' | 'dash' | 'progressive' | 'segment' | 'unknown';
+export type MediaKind = 'vimeo_master' | 'hls' | 'dash' | 'progressive' | 'segment' | 'unknown';
 
 export interface MediaCandidate {
   url: string;
   kind: MediaKind;
 }
 
+const VIMEO_MASTER = /\/master\.json(\?|$)/i;
 const HLS = /\.m3u8(\?|$)/i;
 const DASH = /\.mpd(\?|$)/i;
 const PROGRESSIVE = /\.mp4(\?|$)/i;
 const SEGMENT = /(\.ts|\.m4s|segment|vimeocdn\.com\/.*\/(?:audio|video))/i;
 
 export function classifyMedia(url: string): MediaKind {
+  if (VIMEO_MASTER.test(url)) return 'vimeo_master';
   if (HLS.test(url)) return 'hls';
   if (DASH.test(url)) return 'dash';
   if (PROGRESSIVE.test(url)) return 'progressive';
@@ -39,9 +41,10 @@ export function isMediaUrl(url: string): boolean {
  *   raw segment      (last resort)
  */
 const KIND_RANK: Record<MediaKind, number> = {
-  progressive: 4,
-  hls: 3,
-  dash: 2,
+  vimeo_master: 6,
+  progressive: 5,
+  hls: 4,
+  dash: 3,
   segment: 1,
   unknown: 0,
 };
@@ -103,6 +106,48 @@ export interface HlsMedia {
   /** Initialization segment (fMP4 `#EXT-X-MAP`), required before the fragments. */
   initUrl: string | null;
   segmentUrls: string[];
+}
+
+/**
+ * Vimeo DASH manifest (`master.json?base64_init=1`). Fields we use; the format is
+ * proprietary and may change, so parsing stays defensive.
+ */
+export interface VimeoRendition {
+  base_url?: string;
+  bitrate?: number;
+  init_segment?: string;
+  segments?: Array<{ url?: string }>;
+}
+export interface VimeoMaster {
+  base_url?: string;
+  audio?: VimeoRendition[];
+  video?: VimeoRendition[];
+}
+
+export interface VimeoMasterPlan {
+  /** Base64 fMP4 initialization segment. */
+  initBase64: string | null;
+  segmentUrls: string[];
+}
+
+/** Picks the lightest audio rendition and resolves its init + segment URLs. */
+export function parseVimeoMaster(master: VimeoMaster, masterUrl: string): VimeoMasterPlan {
+  const audios = Array.isArray(master.audio) ? master.audio : [];
+  const videos = Array.isArray(master.video) ? master.video : [];
+  const rendition = [...audios].sort((a, b) => (a.bitrate ?? 0) - (b.bitrate ?? 0))[0] ?? videos[0];
+  if (!rendition) return { initBase64: null, segmentUrls: [] };
+
+  const masterBase = new URL(master.base_url ?? '.', masterUrl);
+  const renditionBase = new URL(rendition.base_url ?? '.', masterBase);
+  const segments = Array.isArray(rendition.segments) ? rendition.segments : [];
+  const segmentUrls = segments
+    .map((s) => (typeof s.url === 'string' ? new URL(s.url, renditionBase).toString() : null))
+    .filter((u): u is string => u !== null);
+
+  return {
+    initBase64: typeof rendition.init_segment === 'string' ? rendition.init_segment : null,
+    segmentUrls,
+  };
 }
 
 /** Parses a media playlist: the init segment (if fMP4) plus the media segments. */
