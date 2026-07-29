@@ -3,7 +3,6 @@ import type { BatchState } from '@/types';
 import {
   runJob,
   runBatch,
-  regenerate,
   getJobState,
   getActiveJob,
   getBatchState,
@@ -98,14 +97,7 @@ chrome.runtime.onMessage.addListener(
 
     if (message.type === 'SUMMARIZE') {
       // Fire and forget — the job runs in the worker; progress is broadcast.
-      // prefetch: warm the other lengths so the length switch is instant.
-      void runJob(message.video, broadcast, undefined, { prefetch: true });
-      sendResponse({ ok: true });
-      return false;
-    }
-
-    if (message.type === 'REGENERATE') {
-      void regenerate(message.videoId, message.detailLevel, broadcast);
+      void runJob(message.video, broadcast);
       sendResponse({ ok: true });
       return false;
     }

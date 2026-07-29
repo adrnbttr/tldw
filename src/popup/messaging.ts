@@ -1,12 +1,4 @@
-import type {
-  ActiveJob,
-  BatchState,
-  DetailLevel,
-  DetectedVideo,
-  JobState,
-  Request,
-  Response,
-} from '@/types';
+import type { ActiveJob, BatchState, DetectedVideo, JobState, Request, Response } from '@/types';
 
 /** Typed wrappers around chrome.runtime messaging for the popup. */
 
@@ -37,10 +29,6 @@ export async function getActiveJob(): Promise<ActiveJob | null> {
 
 export async function requestSummary(video: DetectedVideo): Promise<void> {
   await send({ type: 'SUMMARIZE', video });
-}
-
-export async function requestRegenerate(videoId: string, detailLevel: DetailLevel): Promise<void> {
-  await send({ type: 'REGENERATE', videoId, detailLevel });
 }
 
 export async function cancel(videoId: string): Promise<void> {

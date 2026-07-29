@@ -2,7 +2,6 @@ import { useEffect, useState } from 'preact/hooks';
 import type { DetailLevel, DownloadFormat, Settings, Theme, TranscriptionProvider } from '@/types';
 import { AVAILABLE_MODELS, DEFAULT_SETTINGS } from '@/types';
 import { getSettings, saveSettings } from '@/storage';
-import { listTemplates } from '@/summarizer/template';
 import type { Locale } from '@/i18n';
 import { SUPPORTED_LOCALES, LOCALE_LABELS, isLocale } from '@/i18n';
 import { useI18n } from '@/i18n/context';
@@ -163,20 +162,6 @@ export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Pr
           {DETAIL_ORDER.map((level) => (
             <option key={level} value={level}>
               {t.settings.detailLevels[level]}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label class="field">
-        <span>{t.settings.template}</span>
-        <select
-          value={settings.templateId}
-          onChange={(e) => update('templateId', (e.target as HTMLSelectElement).value)}
-        >
-          {listTemplates().map((tpl) => (
-            <option key={tpl.id} value={tpl.id}>
-              {tpl.label}
             </option>
           ))}
         </select>

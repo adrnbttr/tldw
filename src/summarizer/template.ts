@@ -1,22 +1,18 @@
-import type { SummaryContent, TranscriptSource } from '@/types';
+import type { DetailLevel, SummaryContent, TranscriptSource } from '@/types';
 import type { Locale } from '@/i18n';
 import { SUPPORTED_LOCALES } from '@/i18n';
 
 /**
- * Versioned summary template (F7).
+ * Summary rendering (F7).
  *
- * The template is the guarantor of a constant output formalism. The LLM returns
- * structured JSON (see `SummaryContent`); this module renders it to Markdown in the
- * chosen output language. The model never controls the layout — only the content.
+ * The renderer is the guarantor of a constant output formalism. The LLM returns
+ * one rich structured JSON (see `SummaryContent`); this module renders it to
+ * Markdown in the chosen output language. The model never controls the layout.
+ *
+ * The chosen length is a *rendering* concern, not a generation one: the same JSON
+ * is rendered at three depths, so switching Short/Standard/Detailed is instant and
+ * free (no extra model call).
  */
-
-export interface Template {
-  id: string;
-  label: string;
-  /** JSON schema description injected into the prompt (English, model-facing). */
-  schemaHint: string;
-  render: (input: RenderInput) => string;
-}
 
 export interface RenderInput {
   title: string;
@@ -136,7 +132,7 @@ export function detectSummaryLocale(markdown: string): Locale {
   return 'en';
 }
 
-const SCHEMA_HINT = [
+export const SCHEMA_HINT = [
   'Reply STRICTLY with valid JSON, no surrounding text, in this shape:',
   '{',
   '  "tldr": "3 to 5 lines of synthesis",',
@@ -166,70 +162,48 @@ function finalize(lines: string[]): string {
   );
 }
 
-const defaultTemplate: Template = {
-  id: 'default-v1',
-  label: 'Standard',
-  schemaHint: SCHEMA_HINT,
-  render(input) {
-    const s = strings(input.locale);
-    const { content } = input;
-    const lines: string[] = [...header(input, s)];
+/**
+ * Which parts of the summary a given length renders. The rich JSON always holds
+ * everything; length just gates what is shown (and exported), so the three depths
+ * are visibly different views of one generation.
+ * - concise : In brief · Key points · Takeaways
+ * - standard: + Details (sections)
+ * - detailed: + Terms & concepts (glossary)
+ */
+export function lengthParts(level: DetailLevel): { sections: boolean; glossary: boolean } {
+  return { sections: level !== 'concise', glossary: level === 'detailed' };
+}
 
-    lines.push(`## ${s.inBrief}`, content.tldr.trim(), '');
-    lines.push(`## ${s.keyPoints}`);
-    for (const point of content.keyPoints) lines.push(`- ${point.trim()}`);
-    lines.push('', `## ${s.development}`);
+/** Renders the structured summary to Markdown at the requested length. */
+export function renderSummary(input: RenderInput, level: DetailLevel): string {
+  const s = strings(input.locale);
+  const { content } = input;
+  const { sections, glossary } = lengthParts(level);
+  const lines: string[] = [...header(input, s)];
+
+  lines.push(`## ${s.inBrief}`, content.tldr.trim(), '');
+  lines.push(`## ${s.keyPoints}`);
+  for (const point of content.keyPoints) lines.push(`- ${point.trim()}`);
+  lines.push('');
+
+  if (sections && content.sections.length > 0) {
+    lines.push(`## ${s.development}`);
     for (const section of content.sections) {
       lines.push(`### ${section.heading.trim()}`, section.body.trim(), '');
     }
-    if (content.glossary.length > 0) {
-      lines.push(`## ${s.glossary}`);
-      for (const { term, definition } of content.glossary) {
-        lines.push(`- **${term.trim()}** — ${definition.trim()}`);
-      }
-      lines.push('');
+  }
+
+  if (glossary && content.glossary.length > 0) {
+    lines.push(`## ${s.glossary}`);
+    for (const { term, definition } of content.glossary) {
+      lines.push(`- **${term.trim()}** — ${definition.trim()}`);
     }
-    lines.push(`## ${s.toRemember}`);
-    for (const item of content.takeaways) lines.push(`- ${item.trim()}`);
     lines.push('');
+  }
 
-    return finalize(lines);
-  },
-};
+  lines.push(`## ${s.toRemember}`);
+  for (const item of content.takeaways) lines.push(`- ${item.trim()}`);
+  lines.push('');
 
-/**
- * Compact template — same structured JSON input, but renders only the essentials
- * (In brief · Key points · Takeaways). Useful for quick scanning.
- */
-const compactTemplate: Template = {
-  id: 'compact-v1',
-  label: 'Compact',
-  schemaHint: SCHEMA_HINT,
-  render(input) {
-    const s = strings(input.locale);
-    const { content } = input;
-    const lines: string[] = [...header(input, s)];
-
-    lines.push(`## ${s.inBrief}`, content.tldr.trim(), '');
-    lines.push(`## ${s.keyPoints}`);
-    for (const point of content.keyPoints) lines.push(`- ${point.trim()}`);
-    lines.push('', `## ${s.toRemember}`);
-    for (const item of content.takeaways) lines.push(`- ${item.trim()}`);
-    lines.push('');
-
-    return finalize(lines);
-  },
-};
-
-const TEMPLATES: Record<string, Template> = {
-  [defaultTemplate.id]: defaultTemplate,
-  [compactTemplate.id]: compactTemplate,
-};
-
-export function getTemplate(id: string): Template {
-  return TEMPLATES[id] ?? defaultTemplate;
-}
-
-export function listTemplates(): Template[] {
-  return Object.values(TEMPLATES);
+  return finalize(lines);
 }

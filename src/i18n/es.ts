@@ -64,7 +64,6 @@ export const es: Messages = {
     uiLanguage: 'Idioma de la interfaz',
     detailLevel: 'Longitud del resumen',
     detailLevels: { concise: 'Corto', standard: 'Estándar', detailed: 'Detallado' },
-    template: 'Plantilla de resumen',
     theme: 'Tema',
     themeLabels: { system: 'Sistema', light: 'Claro', dark: 'Oscuro' },
     sectionAppearance: 'Apariencia e idiomas',

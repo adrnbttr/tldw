@@ -84,7 +84,6 @@ export interface Messages {
     uiLanguage: string;
     detailLevel: string;
     detailLevels: Record<DetailLevel, string>;
-    template: string;
     theme: string;
     themeLabels: Record<Theme, string>;
     /** Section headings. */

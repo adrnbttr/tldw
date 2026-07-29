@@ -64,7 +64,6 @@ export const de: Messages = {
     uiLanguage: 'Sprache der Oberfläche',
     detailLevel: 'Zusammenfassungslänge',
     detailLevels: { concise: 'Kurz', standard: 'Standard', detailed: 'Ausführlich' },
-    template: 'Zusammenfassungsvorlage',
     theme: 'Design',
     themeLabels: { system: 'System', light: 'Hell', dark: 'Dunkel' },
     sectionAppearance: 'Aussehen & Sprachen',

@@ -37,9 +37,8 @@ export interface Settings {
   downloadFormat: DownloadFormat;
   /** Whether the first-run onboarding has been completed. */
   onboarded: boolean;
+  /** Default rendered length of a summary (also the export depth). */
   detailLevel: DetailLevel;
-  /** Active summary template id (versioned). */
-  templateId: string;
   /** Global processing timeout for the audio fallback, in seconds. */
   timeoutSeconds: number;
   /** Max number of summaries kept in history. */
@@ -58,7 +57,6 @@ export const DEFAULT_SETTINGS: Settings = {
   downloadFormat: 'pdf',
   onboarded: false,
   detailLevel: 'standard',
-  templateId: 'default-v1',
   timeoutSeconds: 15 * 60,
   historyLimit: 50,
 };

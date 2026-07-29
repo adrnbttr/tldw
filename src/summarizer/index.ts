@@ -2,7 +2,7 @@ import type { DetectedVideo, Settings, Summary, SummaryContent, Transcript } fro
 import { TldwError } from '@/types';
 import { formatDuration, isoDate } from '@/shared/format';
 import { chat } from './openrouter';
-import { getTemplate } from './template';
+import { renderSummary, SCHEMA_HINT } from './template';
 
 /** Model + provider that can watch a YouTube URL directly (Gemini on AI Studio). */
 const YOUTUBE_VIDEO_MODEL = 'google/gemini-2.5-flash';
@@ -77,9 +77,6 @@ export async function summarize(
     throw new TldwError('MISSING_OPENROUTER_KEY', 'OpenRouter API key is missing.');
   }
 
-  const template = getTemplate(settings.templateId);
-  const detailHint = DETAIL_HINT[settings.detailLevel];
-
   let sourceText = transcript.fullText;
 
   // Hierarchical pass for very long transcripts.
@@ -88,11 +85,13 @@ export async function summarize(
   }
 
   const languageName = LANGUAGE_NAMES[settings.outputLanguage] ?? 'English';
+  // Always generate the richest content; length is applied at render time so the
+  // user can switch Short/Standard/Detailed instantly, with no extra model call.
   const system = [
     `You summarize educational videos. Write ALL summary content in ${languageName}.`,
-    detailHint,
-    lengthDirective(settings.detailLevel, transcript.duration),
-    template.schemaHint,
+    DETAIL_HINT.detailed,
+    lengthDirective('detailed', transcript.duration),
+    SCHEMA_HINT,
   ].join('\n\n');
 
   const user = [
@@ -120,15 +119,18 @@ export async function summarize(
   const durationLabel = formatDuration(transcript.duration);
   const date = isoDate();
 
-  const markdown = template.render({
-    title,
-    provider: transcript.metadata.provider,
-    durationLabel,
-    transcriptSource: transcript.source,
-    isoDate: date,
-    locale: settings.outputLanguage,
-    content,
-  });
+  const markdown = renderSummary(
+    {
+      title,
+      provider: transcript.metadata.provider,
+      durationLabel,
+      transcriptSource: transcript.source,
+      isoDate: date,
+      locale: settings.outputLanguage,
+      content,
+    },
+    settings.detailLevel,
+  );
 
   return {
     videoId: transcript.videoId,
@@ -159,13 +161,13 @@ export async function summarizeYouTubeVideo(
     throw new TldwError('MISSING_OPENROUTER_KEY', 'OpenRouter API key is missing.');
   }
 
-  const template = getTemplate(settings.templateId);
   const languageName = LANGUAGE_NAMES[settings.outputLanguage] ?? 'English';
+  // Always generate the richest content; length is a render-time choice.
   const system = [
     `You summarize educational videos. Write ALL summary content in ${languageName}.`,
-    DETAIL_HINT[settings.detailLevel],
-    lengthDirective(settings.detailLevel, video.duration),
-    template.schemaHint,
+    DETAIL_HINT.detailed,
+    lengthDirective('detailed', video.duration),
+    SCHEMA_HINT,
   ].join('\n\n');
 
   const watchUrl = `https://www.youtube.com/watch?v=${video.externalId}`;
@@ -190,15 +192,18 @@ export async function summarizeYouTubeVideo(
   const content = parseSummaryContent(raw);
   const title = video.title ?? 'YouTube video';
   const durationLabel = formatDuration(video.duration);
-  const markdown = template.render({
-    title,
-    provider: 'youtube',
-    durationLabel,
-    transcriptSource: 'youtube_video',
-    isoDate: isoDate(),
-    locale: settings.outputLanguage,
-    content,
-  });
+  const markdown = renderSummary(
+    {
+      title,
+      provider: 'youtube',
+      durationLabel,
+      transcriptSource: 'youtube_video',
+      isoDate: isoDate(),
+      locale: settings.outputLanguage,
+      content,
+    },
+    settings.detailLevel,
+  );
 
   return {
     videoId: video.id,

@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import type { Summary } from '@/types';
-import { templateStrings, detectSummaryLocale } from '@/summarizer/template';
+import { templateStrings, detectSummaryLocale, lengthParts } from '@/summarizer/template';
 import { isoDate, slugify } from '@/shared/format';
 
 /**
@@ -24,6 +24,7 @@ function ascii(text: string): string {
 function renderSummary(doc: jsPDF, summary: Summary): void {
   const s = templateStrings(detectSummaryLocale(summary.markdown));
   const c = summary.content;
+  const parts = lengthParts(summary.detailLevel);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const width = pageWidth - MARGIN * 2;
@@ -96,7 +97,7 @@ function renderSummary(doc: jsPDF, summary: Summary): void {
   heading(s.keyPoints);
   bullets(c.keyPoints);
 
-  if (c.sections.length > 0) {
+  if (parts.sections && c.sections.length > 0) {
     heading(s.development);
     for (const section of c.sections) {
       text(section.heading.trim(), { size: 12, bold: true, gap: 2 });
@@ -104,7 +105,7 @@ function renderSummary(doc: jsPDF, summary: Summary): void {
     }
   }
 
-  if (c.glossary.length > 0) {
+  if (parts.glossary && c.glossary.length > 0) {
     heading(s.glossary);
     bullets(c.glossary.map((g) => `${g.term.trim()} - ${g.definition.trim()}`));
   }

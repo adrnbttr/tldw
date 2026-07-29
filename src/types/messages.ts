@@ -1,5 +1,5 @@
 import type { DetectedVideo } from './video';
-import type { Summary, DetailLevel } from './summary';
+import type { Summary } from './summary';
 import type { TldwErrorCode } from './errors';
 
 /**
@@ -45,7 +45,6 @@ export type Request =
   | { type: 'GET_JOB_STATE'; videoId: string }
   | { type: 'GET_ACTIVE_JOB' }
   | { type: 'SUMMARIZE'; video: DetectedVideo }
-  | { type: 'REGENERATE'; videoId: string; detailLevel: DetailLevel }
   | { type: 'SUMMARIZE_BATCH'; videos: DetectedVideo[] }
   | { type: 'GET_BATCH_STATE' }
   | { type: 'CANCEL'; videoId: string };

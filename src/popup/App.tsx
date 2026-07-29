@@ -5,13 +5,7 @@ import { detectDefaultLocale, getCatalog } from '@/i18n';
 import { I18nContext } from '@/i18n/context';
 import { getSettings } from '@/storage';
 import { applyTheme } from './theme';
-import {
-  listVideos,
-  rescanVideos,
-  requestSummary,
-  requestBatch,
-  requestRegenerate,
-} from './messaging';
+import { listVideos, rescanVideos, requestSummary, requestBatch } from './messaging';
 import { VideoList } from './components/VideoList';
 import { ResultView } from './components/ResultView';
 import { SettingsView } from './components/SettingsView';
@@ -38,7 +32,6 @@ export function App() {
   const [videos, setVideos] = useState<DetectedVideo[]>([]);
   const [jobs, setJobs] = useState<Record<string, JobState>>({});
   const [viewing, setViewing] = useState<Viewing | null>(null);
-  const [regenerating, setRegenerating] = useState(false);
   const [rescanning, setRescanning] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>('pdf');
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
@@ -66,7 +59,6 @@ export function App() {
       if (msg.type !== 'JOB_STATE' || !('videoId' in msg.state)) return;
       const state = msg.state;
       setJobs((prev) => ({ ...prev, [state.videoId]: state }));
-      if (state.phase !== 'running') setRegenerating(false);
     };
     chrome.runtime.onMessage.addListener(onMessage);
     return () => chrome.runtime.onMessage.removeListener(onMessage);
@@ -98,13 +90,6 @@ export function App() {
       .finally(() => setRescanning(false));
   };
 
-  // Keep the open result in sync with regeneration (new summary arrives via jobs).
-  const shown = viewing
-    ? viewing.liveId && jobs[viewing.liveId]?.phase === 'done'
-      ? (jobs[viewing.liveId] as { summary: Summary }).summary
-      : viewing.summary
-    : null;
-
   const content = () => {
     if (onboarded === null) return <div class="screen" />; // brief settings load
     if (!onboarded) {
@@ -116,25 +101,14 @@ export function App() {
         />
       );
     }
-    if (shown && viewing) {
+    if (viewing) {
       const cat = getCatalog(locale);
-      const liveId = viewing.liveId;
       return (
         <ResultView
-          summary={shown}
+          summary={viewing.summary}
           onBack={() => setViewing(null)}
-          backLabel={liveId ? cat.nav.videos : cat.history.heading}
+          backLabel={viewing.liveId ? cat.nav.videos : cat.history.heading}
           primaryFormat={downloadFormat}
-          regenerating={regenerating}
-          onChangeLength={
-            liveId
-              ? (level) => {
-                  setRegenerating(true);
-                  // Target the job id (regeneration cache key), not the summary id.
-                  void requestRegenerate(liveId, level);
-                }
-              : undefined
-          }
         />
       );
     }

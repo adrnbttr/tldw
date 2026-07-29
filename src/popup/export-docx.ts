@@ -1,6 +1,6 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 import type { Summary } from '@/types';
-import { templateStrings, detectSummaryLocale } from '@/summarizer/template';
+import { templateStrings, detectSummaryLocale, lengthParts } from '@/summarizer/template';
 import { isoDate, slugify } from '@/shared/format';
 
 /**
@@ -23,6 +23,7 @@ function bullets(items: string[]): Paragraph[] {
 export function buildDocx(summary: Summary): Document {
   const s = templateStrings(detectSummaryLocale(summary.markdown));
   const c = summary.content;
+  const parts = lengthParts(summary.detailLevel);
   const children: Paragraph[] = [];
 
   children.push(new Paragraph({ text: summary.title, heading: HeadingLevel.TITLE }));
@@ -56,7 +57,7 @@ export function buildDocx(summary: Summary): Document {
   children.push(new Paragraph({ text: s.keyPoints, heading: HeadingLevel.HEADING_1 }));
   children.push(...bullets(c.keyPoints));
 
-  if (c.sections.length > 0) {
+  if (parts.sections && c.sections.length > 0) {
     children.push(new Paragraph({ text: s.development, heading: HeadingLevel.HEADING_1 }));
     for (const section of c.sections) {
       children.push(
@@ -66,7 +67,7 @@ export function buildDocx(summary: Summary): Document {
     }
   }
 
-  if (c.glossary.length > 0) {
+  if (parts.glossary && c.glossary.length > 0) {
     children.push(new Paragraph({ text: s.glossary, heading: HeadingLevel.HEADING_1 }));
     for (const { term, definition } of c.glossary) {
       children.push(
