@@ -10,7 +10,13 @@ Runs entirely in your browser, with your own API keys. No backend. No subscripti
 
 <br/>
 
-<a href="https://github.com/adrnbttr/tldw/actions/workflows/ci.yml"><img src="https://github.com/adrnbttr/tldw/actions/workflows/ci.yml/badge.svg" alt="CI" height="20" /></a>&nbsp;<a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-4f46e5.svg" alt="License: MIT" height="20" /></a>&nbsp;<a href="https://developer.chrome.com/docs/extensions/mv3/intro/"><img src="https://img.shields.io/badge/manifest-v3-4f46e5.svg" alt="Manifest V3" height="20" /></a>&nbsp;<a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/typescript-strict-3178c6.svg" alt="TypeScript" height="20" /></a>&nbsp;<a href="./CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-22c55e.svg" alt="PRs welcome" height="20" /></a>
+<table><tr>
+<td><a href="https://github.com/adrnbttr/tldw/actions/workflows/ci.yml"><img src="https://github.com/adrnbttr/tldw/actions/workflows/ci.yml/badge.svg" alt="CI" height="20" /></a></td>
+<td><a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-4f46e5.svg" alt="License: MIT" height="20" /></a></td>
+<td><a href="https://developer.chrome.com/docs/extensions/mv3/intro/"><img src="https://img.shields.io/badge/manifest-v3-4f46e5.svg" alt="Manifest V3" height="20" /></a></td>
+<td><a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/typescript-strict-3178c6.svg" alt="TypeScript" height="20" /></a></td>
+<td><a href="./CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-22c55e.svg" alt="PRs welcome" height="20" /></a></td>
+</tr></table>
 
 </div>
 

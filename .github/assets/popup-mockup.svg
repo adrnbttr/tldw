@@ -1,4 +1,4 @@
-<svg width="760" height="440" viewBox="0 0 760 440" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="tldw popup — video list and rendered summary">
+<svg width="760" height="440" viewBox="0 0 760 440" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="tldw popup — multi-video dashboard and rendered summary">
   <defs>
     <linearGradient id="accent2" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#818cf8"/>
@@ -11,83 +11,96 @@
 
   <rect width="760" height="440" rx="16" fill="#0f1020"/>
 
-  <!-- LIST VIEW -->
+  <!-- ── LIST / DASHBOARD VIEW ─────────────────────────────── -->
   <g transform="translate(40,40)" filter="url(#shadow)">
     <rect width="320" height="360" rx="14" fill="#17171a"/>
     <rect width="320" height="360" rx="14" fill="none" stroke="#2a2a30"/>
     <!-- topbar -->
-    <text x="20" y="38" font-family="ui-monospace, Menlo, monospace" font-size="17" font-weight="700" fill="#ededed">tldw</text>
-    <text x="286" y="38" font-size="16" fill="#9ca3af">⚙</text>
-    <line x1="0" y1="56" x2="320" y2="56" stroke="#2a2a30"/>
+    <text x="20" y="36" font-family="ui-monospace, Menlo, monospace" font-size="17" font-weight="700" fill="#ededed">tldw</text>
+    <text x="262" y="36" font-size="15" fill="#9ca3af">🕘</text>
+    <text x="288" y="36" font-size="15" fill="#9ca3af">⚙</text>
+    <line x1="0" y1="52" x2="320" y2="52" stroke="#2a2a30"/>
+    <!-- overview -->
+    <text x="20" y="72" font-family="system-ui, sans-serif" font-size="11" fill="#9ca3af">2 vidéos · 1 résumée</text>
 
-    <!-- item 1 -->
-    <g transform="translate(16,74)">
-      <rect width="288" height="86" rx="10" fill="#202027" stroke="#2a2a30"/>
+    <!-- item 1 — done -->
+    <g transform="translate(16,82)">
+      <rect width="288" height="76" rx="10" fill="#1c2420" stroke="#22c55e55"/>
       <rect x="14" y="14" width="66" height="20" rx="6" fill="#ff000022"/>
       <text x="47" y="28" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#ff6b6b" text-anchor="middle">YouTube</text>
       <text x="90" y="29" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#ededed">Module 3 — Phonologie</text>
       <text x="14" y="52" font-family="system-ui, sans-serif" font-size="11" fill="#9ca3af">30 min 47</text>
-      <rect x="14" y="60" width="260" height="14" rx="7" fill="none"/>
-      <rect x="180" y="56" width="94" height="20" rx="8" fill="url(#accent2)"/>
-      <text x="227" y="70" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Résumer</text>
+      <text x="150" y="53" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#22c55e">✓ Terminé</text>
+      <rect x="216" y="42" width="58" height="22" rx="8" fill="url(#accent2)"/>
+      <text x="245" y="57" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Voir</text>
     </g>
 
-    <!-- item 2 -->
-    <g transform="translate(16,172)">
-      <rect width="288" height="86" rx="10" fill="#202027" stroke="#2a2a30"/>
+    <!-- item 2 — running -->
+    <g transform="translate(16,168)">
+      <rect width="288" height="76" rx="10" fill="#202027" stroke="#2a2a30"/>
       <rect x="14" y="14" width="52" height="20" rx="6" fill="#1ab7ea22"/>
       <text x="40" y="28" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#1ab7ea" text-anchor="middle">Vimeo</text>
       <text x="76" y="29" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#ededed">Étude de cas clinique</text>
-      <text x="14" y="52" font-family="system-ui, sans-serif" font-size="11" fill="#9ca3af">12 min 08</text>
-      <rect x="180" y="56" width="94" height="20" rx="8" fill="url(#accent2)"/>
-      <text x="227" y="70" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Résumer</text>
+      <text x="14" y="53" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#818cf8">⟳ Génération du résumé…</text>
+      <text x="256" y="53" font-family="system-ui, sans-serif" font-size="11" fill="#9ca3af">Annuler</text>
     </g>
 
-    <!-- processing hint -->
-    <g transform="translate(16,272)">
-      <text x="4" y="14" font-family="system-ui, sans-serif" font-size="11" fill="#818cf8" font-weight="600">✓ Détection  ✓ Sous-titres  ⟳ Résumé…</text>
-      <rect x="0" y="26" width="288" height="6" rx="3" fill="#2a2a30"/>
-      <rect x="0" y="26" width="196" height="6" rx="3" fill="url(#accent2)"/>
+    <!-- batch progress -->
+    <g transform="translate(16,256)">
+      <text x="0" y="12" font-family="system-ui, sans-serif" font-size="11" fill="#9ca3af">Traitement du lot</text>
+      <text x="288" y="12" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a5b4fc" text-anchor="end">1 / 2</text>
+      <rect x="0" y="22" width="288" height="6" rx="3" fill="#2a2a30"/>
+      <rect x="0" y="22" width="144" height="6" rx="3" fill="url(#accent2)"/>
     </g>
   </g>
 
-  <!-- RESULT VIEW -->
+  <!-- ── RESULT VIEW ───────────────────────────────────────── -->
   <g transform="translate(400,40)" filter="url(#shadow)">
     <rect width="320" height="360" rx="14" fill="#17171a"/>
     <rect width="320" height="360" rx="14" fill="none" stroke="#2a2a30"/>
-    <text x="20" y="34" font-family="system-ui, sans-serif" font-size="13" fill="#818cf8">← Retour</text>
-    <text x="128" y="34" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#ededed">Résumé</text>
+    <!-- breadcrumb -->
+    <text x="20" y="34" font-family="system-ui, sans-serif" font-size="13" fill="#818cf8">Vidéos</text>
+    <text x="66" y="34" font-family="system-ui, sans-serif" font-size="13" fill="#6b7280">›</text>
+    <text x="78" y="34" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#ededed">Résumé</text>
     <line x1="0" y1="50" x2="320" y2="50" stroke="#2a2a30"/>
 
-    <text x="20" y="72" font-family="system-ui, sans-serif" font-size="10" fill="#9ca3af">Méthode : Sous-titres YouTube</text>
+    <text x="20" y="70" font-family="system-ui, sans-serif" font-size="10" fill="#9ca3af">Méthode : Sous-titres YouTube</text>
+
+    <!-- length selector (3 levels) -->
+    <g transform="translate(16,80)">
+      <rect width="288" height="26" rx="8" fill="#202027" stroke="#2a2a30"/>
+      <rect x="98" y="2" width="92" height="22" rx="7" fill="url(#accent2)"/>
+      <text x="49" y="17" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#9ca3af" text-anchor="middle">Court</text>
+      <text x="144" y="17" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Standard</text>
+      <text x="239" y="17" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#9ca3af" text-anchor="middle">Détaillé</text>
+    </g>
 
     <!-- rendered markdown card -->
-    <g transform="translate(16,84)">
-      <rect width="288" height="212" rx="10" fill="#1b1b20" stroke="#2a2a30"/>
-      <text x="16" y="28" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#ededed">Module 3 — Phonologie</text>
-      <text x="16" y="50" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a5b4fc">En bref</text>
+    <g transform="translate(16,116)">
+      <rect width="288" height="178" rx="10" fill="#1b1b20" stroke="#2a2a30"/>
+      <text x="16" y="26" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#ededed">Module 3 — Phonologie</text>
+      <text x="16" y="48" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a5b4fc">En bref</text>
       <g fill="#c7d2fe">
-        <rect x="16" y="58" width="252" height="7" rx="3.5"/>
-        <rect x="16" y="70" width="228" height="7" rx="3.5"/>
+        <rect x="16" y="56" width="252" height="7" rx="3.5"/>
+        <rect x="16" y="68" width="228" height="7" rx="3.5"/>
       </g>
-      <text x="16" y="98" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a5b4fc">Points clés</text>
+      <text x="16" y="94" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a5b4fc">Points clés</text>
       <g fill="#8b90c0">
-        <circle cx="20" cy="112" r="2.5"/><rect x="30" y="108" width="222" height="7" rx="3.5"/>
-        <circle cx="20" cy="128" r="2.5"/><rect x="30" y="124" width="200" height="7" rx="3.5"/>
-        <circle cx="20" cy="144" r="2.5"/><rect x="30" y="140" width="214" height="7" rx="3.5"/>
+        <circle cx="20" cy="108" r="2.5"/><rect x="30" y="104" width="222" height="7" rx="3.5"/>
+        <circle cx="20" cy="124" r="2.5"/><rect x="30" y="120" width="200" height="7" rx="3.5"/>
+        <circle cx="20" cy="140" r="2.5"/><rect x="30" y="136" width="214" height="7" rx="3.5"/>
       </g>
-      <text x="16" y="172" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a5b4fc">À retenir</text>
-      <g fill="#8b90c0">
-        <circle cx="20" cy="186" r="2.5"/><rect x="30" y="182" width="188" height="7" rx="3.5"/>
-      </g>
+      <text x="16" y="166" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#a5b4fc">À retenir</text>
     </g>
 
     <!-- actions -->
-    <g transform="translate(16,308)">
-      <rect width="138" height="34" rx="9" fill="url(#accent2)"/>
-      <text x="69" y="22" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">Télécharger .md</text>
-      <rect x="150" y="0" width="138" height="34" rx="9" fill="none" stroke="#6366f1"/>
-      <text x="219" y="22" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#a5b4fc" text-anchor="middle">Copier</text>
+    <g transform="translate(16,306)">
+      <rect width="112" height="34" rx="9" fill="url(#accent2)"/>
+      <text x="56" y="22" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">Télécharger PDF</text>
+      <rect x="120" y="0" width="80" height="34" rx="9" fill="none" stroke="#6366f1"/>
+      <text x="160" y="22" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#a5b4fc" text-anchor="middle">Word</text>
+      <rect x="208" y="0" width="80" height="34" rx="9" fill="none" stroke="#6366f1"/>
+      <text x="248" y="22" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#a5b4fc" text-anchor="middle">Copier</text>
     </g>
   </g>
 </svg>
