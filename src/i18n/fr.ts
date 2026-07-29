@@ -11,6 +11,8 @@ export const fr: Messages = {
     untreatable: 'non traitable',
     summarize: 'Résumer',
     summarizeSelection: (count) => `Résumer la sélection (${count})`,
+    summarizeAll: (count) => `Résumer tout (${count})`,
+    view: 'Voir',
   },
   transcription: {
     fetchingMedia: 'Récupération du flux média…',

@@ -11,6 +11,8 @@ export const es: Messages = {
     untreatable: 'no compatible',
     summarize: 'Resumir',
     summarizeSelection: (count) => `Resumir la selección (${count})`,
+    summarizeAll: (count) => `Resumir todo (${count})`,
+    view: 'Ver',
   },
   transcription: {
     fetchingMedia: 'Recuperando el flujo multimedia…',

@@ -32,6 +32,8 @@ export interface Messages {
     untreatable: string;
     summarize: string;
     summarizeSelection: (count: number) => string;
+    summarizeAll: (count: number) => string;
+    view: string;
   };
   transcription: {
     fetchingMedia: string;

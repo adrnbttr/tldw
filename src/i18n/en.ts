@@ -11,6 +11,8 @@ export const en: Messages = {
     untreatable: 'not supported',
     summarize: 'Summarize',
     summarizeSelection: (count) => `Summarize selection (${count})`,
+    summarizeAll: (count) => `Summarize all (${count})`,
+    view: 'View',
   },
   transcription: {
     fetchingMedia: 'Fetching the media stream…',

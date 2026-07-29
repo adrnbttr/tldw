@@ -1,125 +1,113 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { Broadcast, BatchState, DetectedVideo, JobState, Summary } from '@/types';
+import type { Broadcast, DetectedVideo, JobState, Summary } from '@/types';
 import type { Locale } from '@/i18n';
 import { detectDefaultLocale, getCatalog } from '@/i18n';
 import { I18nContext } from '@/i18n/context';
 import { getSettings } from '@/storage';
-import {
-  listVideos,
-  requestBatch,
-  requestRegenerate,
-  getBatchState,
-  getActiveJob,
-} from './messaging';
+import { listVideos, requestSummary, requestBatch, requestRegenerate } from './messaging';
 import { VideoList } from './components/VideoList';
-import { ProcessingView } from './components/ProcessingView';
 import { ResultView } from './components/ResultView';
 import { SettingsView } from './components/SettingsView';
 import { HistoryView } from './components/HistoryView';
-import { BatchView } from './components/BatchView';
 
 /**
  * Popup root (F2).
  *
- * Views: list · processing · result · settings · history · batch. Job and batch
- * state are owned by the service worker; the popup subscribes to broadcasts and
- * restores state on open, so work keeps running while the popup is closed.
+ * The video list is a live dashboard: every video on the page shows its status
+ * (idle · running · done) and its result is one click away — so multiple videos are
+ * handled without losing any. Jobs run in the service worker and broadcast state.
  */
-type Screen = 'list' | 'settings' | 'history' | 'batch';
+type Screen = 'list' | 'settings' | 'history';
+interface Viewing {
+  summary: Summary;
+  /** videoId of a live session job → enables in-place length regeneration. */
+  liveId?: string;
+}
 
 export function App() {
   const [locale, setLocale] = useState<Locale>(detectDefaultLocale());
   const [screen, setScreen] = useState<Screen>('list');
   const [videos, setVideos] = useState<DetectedVideo[]>([]);
-  const [active, setActive] = useState<DetectedVideo | null>(null);
-  const [jobState, setJobState] = useState<JobState>({ phase: 'idle' });
-  const [batchState, setBatchState] = useState<BatchState>({ phase: 'idle' });
-  const [historySummary, setHistorySummary] = useState<Summary | null>(null);
+  const [jobs, setJobs] = useState<Record<string, JobState>>({});
+  const [viewing, setViewing] = useState<Viewing | null>(null);
   const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     void getSettings().then((s) => setLocale(s.uiLanguage));
     void listVideos().then(setVideos);
 
-    // Restore in-flight work after the popup was closed and reopened (F2).
-    void (async () => {
-      const batch = await getBatchState();
-      if (batch.phase === 'running') {
-        setBatchState(batch);
-        setScreen('batch');
-        return;
-      }
-      const job = await getActiveJob();
-      if (job && job.state.phase === 'running') {
-        setActive(job.video);
-        setJobState(job.state);
-      }
-    })();
-
     const onMessage = (msg: Broadcast) => {
-      if (msg.type === 'JOB_STATE') {
-        setJobState(msg.state);
-        if (msg.state.phase !== 'running') setRegenerating(false);
-      }
-      if (msg.type === 'BATCH_STATE') setBatchState(msg.state);
+      if (msg.type !== 'JOB_STATE' || !('videoId' in msg.state)) return;
+      const state = msg.state;
+      setJobs((prev) => ({ ...prev, [state.videoId]: state }));
+      if (state.phase !== 'running') setRegenerating(false);
     };
     chrome.runtime.onMessage.addListener(onMessage);
     return () => chrome.runtime.onMessage.removeListener(onMessage);
   }, []);
 
-  const startFor = (video: DetectedVideo) => {
-    setActive(video);
-    setJobState({ phase: 'running', videoId: video.id, steps: [] });
+  const summarize = (video: DetectedVideo) => {
+    setJobs((p) => ({ ...p, [video.id]: { phase: 'running', videoId: video.id, steps: [] } }));
+    void requestSummary(video);
   };
 
-  const startBatch = (chosen: DetectedVideo[]) => {
+  const summarizeAll = (chosen: DetectedVideo[]) => {
+    setJobs((p) => {
+      const next = { ...p };
+      for (const v of chosen) next[v.id] = { phase: 'running', videoId: v.id, steps: [] };
+      return next;
+    });
     void requestBatch(chosen);
-    void getBatchState().then(setBatchState);
-    setScreen('batch');
   };
 
-  const backToList = () => {
-    setActive(null);
-    setJobState({ phase: 'idle' });
-    setScreen('list');
-    void listVideos().then(setVideos);
+  const openLive = (videoId: string) => {
+    const st = jobs[videoId];
+    if (st?.phase === 'done') setViewing({ summary: st.summary, liveId: videoId });
   };
+
+  // Keep the open result in sync with regeneration (new summary arrives via jobs).
+  const shown = viewing
+    ? viewing.liveId && jobs[viewing.liveId]?.phase === 'done'
+      ? (jobs[viewing.liveId] as { summary: Summary }).summary
+      : viewing.summary
+    : null;
 
   const content = () => {
+    if (shown && viewing) {
+      return (
+        <ResultView
+          summary={shown}
+          onBack={() => setViewing(null)}
+          regenerating={regenerating}
+          onChangeLength={
+            viewing.liveId
+              ? (level) => {
+                  setRegenerating(true);
+                  void requestRegenerate(shown.videoId, level);
+                }
+              : undefined
+          }
+        />
+      );
+    }
     if (screen === 'settings') {
       return <SettingsView onClose={() => setScreen('list')} onLocaleChange={setLocale} />;
     }
     if (screen === 'history') {
-      if (historySummary) {
-        return <ResultView summary={historySummary} onBack={() => setHistorySummary(null)} />;
-      }
-      return <HistoryView onOpen={setHistorySummary} onClose={() => setScreen('list')} />;
-    }
-    if (screen === 'batch') {
-      return <BatchView state={batchState} onBack={backToList} />;
-    }
-    if (active && jobState.phase === 'done') {
-      const summary = jobState.summary;
       return (
-        <ResultView
-          summary={summary}
-          onBack={backToList}
-          regenerating={regenerating}
-          onChangeLength={(level) => {
-            setRegenerating(true);
-            void requestRegenerate(summary.videoId, level);
-          }}
+        <HistoryView
+          onOpen={(summary) => setViewing({ summary })}
+          onClose={() => setScreen('list')}
         />
       );
-    }
-    if (active && (jobState.phase === 'running' || jobState.phase === 'error')) {
-      return <ProcessingView video={active} state={jobState} onBack={backToList} />;
     }
     return (
       <VideoList
         videos={videos}
-        onSummarize={startFor}
-        onBatch={startBatch}
+        jobs={jobs}
+        onSummarize={summarize}
+        onSummarizeAll={summarizeAll}
+        onView={openLive}
         onOpenSettings={() => setScreen('settings')}
         onOpenHistory={() => setScreen('history')}
       />

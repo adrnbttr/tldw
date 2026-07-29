@@ -8,6 +8,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Multi-video dashboard.** The popup list is now a live dashboard: every video on
+  the page shows its status inline (idle · summarizing… · done), each result is one
+  click away (**View**), a **Summarize all (n)** action processes them together, and a
+  combined **PDF** collects them — no more losing track when a page has several videos.
 - **Adjust length on the result.** A Short / Standard / Detailed switch on the summary
   regenerates it in place at the chosen length — reusing the cached source (transcript
   or the YouTube video) so only the model re-runs, no re-download or re-transcription.
