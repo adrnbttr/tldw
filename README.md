@@ -10,7 +10,11 @@ Runs entirely in your browser, with your own API keys. No backend. No subscripti
 
 <br/>
 
-<a href="https://github.com/adrnbttr/tldw/actions/workflows/ci.yml"><img src="https://github.com/adrnbttr/tldw/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>&nbsp;<a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-4f46e5.svg" alt="License: MIT" /></a>&nbsp;<a href="https://developer.chrome.com/docs/extensions/mv3/intro/"><img src="https://img.shields.io/badge/manifest-v3-4f46e5.svg" alt="Manifest V3" /></a>
+<table><tr>
+<td><a href="https://github.com/adrnbttr/tldw/actions/workflows/ci.yml"><img src="https://github.com/adrnbttr/tldw/actions/workflows/ci.yml/badge.svg" alt="CI" height="20" /></a></td>
+<td><a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-4f46e5.svg" alt="License: MIT" height="20" /></a></td>
+<td><a href="https://developer.chrome.com/docs/extensions/mv3/intro/"><img src="https://img.shields.io/badge/manifest-v3-4f46e5.svg" alt="Manifest V3" height="20" /></a></td>
+</tr></table>
 
 </div>
 
