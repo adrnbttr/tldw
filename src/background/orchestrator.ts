@@ -1,6 +1,7 @@
 import type {
   BatchItemResult,
   BatchState,
+  DetailLevel,
   DetectedVideo,
   JobState,
   JobProgress,
@@ -29,6 +30,11 @@ const jobs = new Map<string, JobState>();
 const jobVideos = new Map<string, DetectedVideo>();
 const controllers = new Map<string, AbortController>();
 let lastJobId: string | null = null;
+
+/** What a finished job needs to re-summarize at a new length, cheaply. */
+type RegenSource =
+  { kind: 'transcript'; transcript: Transcript } | { kind: 'youtube'; video: DetectedVideo };
+const regenSources = new Map<string, RegenSource>();
 
 type Broadcaster = (state: JobState, progress?: JobProgress) => void;
 
@@ -116,7 +122,11 @@ export function cancelJob(videoId: string): void {
   controllers.delete(videoId);
 }
 
-export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Promise<void> {
+export async function runJob(
+  video: DetectedVideo,
+  broadcast: Broadcaster,
+  detailOverride?: DetailLevel,
+): Promise<void> {
   const controller = new AbortController();
   controllers.set(video.id, controller);
   jobVideos.set(video.id, video);
@@ -138,10 +148,13 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
   broadcast({ phase: 'running', videoId: video.id, steps });
 
   try {
-    const settings = await getSettings();
+    const base = await getSettings();
+    const settings = detailOverride ? { ...base, detailLevel: detailOverride } : base;
 
-    // Cache hit — skip processing entirely (spec §3.9).
-    const cached = await findCachedSummary(video.provider, video.externalId);
+    // Cache hit — skip processing entirely (spec §3.9). Skip when regenerating.
+    const cached = detailOverride
+      ? null
+      : await findCachedSummary(video.provider, video.externalId);
     if (cached) {
       const done: JobState = { phase: 'done', videoId: video.id, summary: cached };
       jobs.set(video.id, done);
@@ -150,6 +163,12 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
     }
 
     const transcript = await extract(video, settings, signal, setStep);
+
+    // Remember the source so the popup can regenerate at a new length cheaply.
+    regenSources.set(
+      video.id,
+      transcript ? { kind: 'transcript', transcript } : { kind: 'youtube', video },
+    );
 
     // null transcript → YouTube captions unavailable: Gemini watches the URL.
     let summary: Summary;
@@ -182,6 +201,50 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
     broadcast(state);
   } finally {
     controllers.delete(video.id);
+  }
+}
+
+/**
+ * Re-summarizes an existing result at a new length, in place. Reuses the cached
+ * source (transcript, or the YouTube video) so only the LLM runs — no re-download
+ * or re-transcription. Falls back to a fresh run if the source was evicted.
+ */
+export async function regenerate(
+  videoId: string,
+  detailLevel: DetailLevel,
+  broadcast: Broadcaster,
+): Promise<void> {
+  const src = regenSources.get(videoId);
+  const video = jobVideos.get(videoId);
+  try {
+    const settings = { ...(await getSettings()), detailLevel };
+    let summary: Summary;
+    if (src?.kind === 'transcript') {
+      summary = await summarize(src.transcript, settings);
+    } else if (src?.kind === 'youtube') {
+      summary = await summarizeYouTubeVideo(src.video, settings);
+    } else if (video) {
+      await runJob(video, broadcast, detailLevel);
+      return;
+    } else {
+      throw new TldwError('UNKNOWN', 'Nothing to regenerate.');
+    }
+    if (video) await saveSummary(video.provider, video.externalId, summary);
+    const done: JobState = { phase: 'done', videoId, summary };
+    jobs.set(videoId, done);
+    broadcast(done);
+  } catch (err) {
+    const code = err instanceof TldwError ? err.code : 'UNKNOWN';
+    const detail = err instanceof TldwError ? err.providerMessage : undefined;
+    const state: JobState = {
+      phase: 'error',
+      videoId,
+      code,
+      message: messageFor(err),
+      detail: detail?.slice(0, 600),
+    };
+    jobs.set(videoId, state);
+    broadcast(state);
   }
 }
 

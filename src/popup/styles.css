@@ -259,6 +259,61 @@ button.secondary {
   margin: 0 0 10px;
 }
 
+.length-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.length-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.seg {
+  background: var(--bg);
+  color: var(--fg);
+  border: none;
+  border-left: 1px solid var(--border);
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.seg:first-child {
+  border-left: none;
+}
+
+.seg.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+
+.seg:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.length-switch .spinner {
+  color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .markdown {
   border: 1px solid var(--border);
   border-radius: 10px;

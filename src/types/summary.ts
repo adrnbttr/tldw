@@ -36,6 +36,8 @@ export interface Summary {
   createdAt: string;
   /** Output language, for localizing exports (Word headings). */
   locale: Locale;
+  /** Length level this summary was generated at (for the in-result switch). */
+  detailLevel: DetailLevel;
   /** Model id used at OpenRouter. */
   model: string;
   content: SummaryContent;

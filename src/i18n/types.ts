@@ -53,6 +53,7 @@ export interface Messages {
     back: string;
     heading: string;
     method: (source: string) => string;
+    length: string;
     downloadPdf: string;
     downloadWord: string;
     copy: string;

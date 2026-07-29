@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import type { Summary } from '@/types';
+import type { DetailLevel, Summary } from '@/types';
 import { renderMarkdown } from '@/shared/markdown';
 import { useI18n } from '@/i18n/context';
 import { copyPlainText } from '../export';
@@ -9,9 +9,14 @@ import { downloadPdf } from '../export-pdf';
 interface Props {
   summary: Summary;
   onBack: () => void;
+  /** Present only for the active result: regenerate at a new length in place. */
+  onChangeLength?: (level: DetailLevel) => void;
+  regenerating?: boolean;
 }
 
-export function ResultView({ summary, onBack }: Props) {
+const LEVELS: DetailLevel[] = ['concise', 'standard', 'detailed'];
+
+export function ResultView({ summary, onBack, onChangeLength, regenerating }: Props) {
   const t = useI18n();
   const [copied, setCopied] = useState(false);
 
@@ -31,6 +36,29 @@ export function ResultView({ summary, onBack }: Props) {
       </header>
 
       <p class="method">{t.result.method(t.sources[summary.transcriptSource])}</p>
+
+      {onChangeLength && (
+        <div class={`length-switch ${regenerating ? 'busy' : ''}`}>
+          <span class="length-label">{t.result.length}</span>
+          <div class="segmented">
+            {LEVELS.map((level) => (
+              <button
+                key={level}
+                class={summary.detailLevel === level ? 'seg active' : 'seg'}
+                disabled={regenerating}
+                onClick={() => level !== summary.detailLevel && onChangeLength(level)}
+              >
+                {t.settings.detailLevels[level]}
+              </button>
+            ))}
+          </div>
+          {regenerating && (
+            <span class="spinner" aria-label="…">
+              ⟳
+            </span>
+          )}
+        </div>
+      )}
 
       <div
         class="markdown"

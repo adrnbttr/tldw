@@ -8,6 +8,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Adjust length on the result.** A Short / Standard / Detailed switch on the summary
+  regenerates it in place at the chosen length — reusing the cached source (transcript
+  or the YouTube video) so only the model re-runs, no re-download or re-transcription.
 - **Duration-aware summary length.** A summary now stays scannable whatever the video
   length: the **Summary length** setting (Short / Standard / Detailed) sets a word and
   section budget, nudged by the video's duration within a strict cap — a 1-hour video

@@ -4,7 +4,13 @@ import type { Locale } from '@/i18n';
 import { detectDefaultLocale, getCatalog } from '@/i18n';
 import { I18nContext } from '@/i18n/context';
 import { getSettings } from '@/storage';
-import { listVideos, requestBatch, getBatchState, getActiveJob } from './messaging';
+import {
+  listVideos,
+  requestBatch,
+  requestRegenerate,
+  getBatchState,
+  getActiveJob,
+} from './messaging';
 import { VideoList } from './components/VideoList';
 import { ProcessingView } from './components/ProcessingView';
 import { ResultView } from './components/ResultView';
@@ -29,6 +35,7 @@ export function App() {
   const [jobState, setJobState] = useState<JobState>({ phase: 'idle' });
   const [batchState, setBatchState] = useState<BatchState>({ phase: 'idle' });
   const [historySummary, setHistorySummary] = useState<Summary | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     void getSettings().then((s) => setLocale(s.uiLanguage));
@@ -50,7 +57,10 @@ export function App() {
     })();
 
     const onMessage = (msg: Broadcast) => {
-      if (msg.type === 'JOB_STATE') setJobState(msg.state);
+      if (msg.type === 'JOB_STATE') {
+        setJobState(msg.state);
+        if (msg.state.phase !== 'running') setRegenerating(false);
+      }
       if (msg.type === 'BATCH_STATE') setBatchState(msg.state);
     };
     chrome.runtime.onMessage.addListener(onMessage);
@@ -89,7 +99,18 @@ export function App() {
       return <BatchView state={batchState} onBack={backToList} />;
     }
     if (active && jobState.phase === 'done') {
-      return <ResultView summary={jobState.summary} onBack={backToList} />;
+      const summary = jobState.summary;
+      return (
+        <ResultView
+          summary={summary}
+          onBack={backToList}
+          regenerating={regenerating}
+          onChangeLength={(level) => {
+            setRegenerating(true);
+            void requestRegenerate(summary.videoId, level);
+          }}
+        />
+      );
     }
     if (active && (jobState.phase === 'running' || jobState.phase === 'error')) {
       return <ProcessingView video={active} state={jobState} onBack={backToList} />;

@@ -37,6 +37,7 @@ export const fr: Messages = {
     back: '← Retour',
     heading: 'Résumé',
     method: (source) => `Méthode : ${source}`,
+    length: 'Longueur',
     downloadPdf: 'Télécharger (PDF)',
     downloadWord: 'Word',
     copy: 'Copier',
