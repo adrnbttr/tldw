@@ -165,7 +165,7 @@ Open the popup → **⚙️ Settings**:
 | **Audio transcription** | For videos without captions. Default: **OpenRouter (Gemini)** — reuses your OpenRouter key, nothing else to set up. Optionally switch to **OpenAI Whisper** (needs a separate [OpenAI key](https://platform.openai.com/api-keys)) for word-level timings. |
 | **Summary model** | `Claude Sonnet` (recommended for format fidelity) or `Gemini Flash` for very long transcripts. |
 | **Interface language** | English · Français · Español · Deutsch (applies instantly). |
-| **Summary language / detail level** | Language of the generated summary, and how concise it is. |
+| **Summary language / length** | Language of the summary, and its length — **Short / Standard / Detailed**. Length also adapts to the video's duration (capped), so long videos stay scannable. |
 
 Keys are stored locally and never leave your browser except toward the provider they target. See [`docs/PRIVACY.md`](./docs/PRIVACY.md).
 

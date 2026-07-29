@@ -8,6 +8,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Duration-aware summary length.** A summary now stays scannable whatever the video
+  length: the **Summary length** setting (Short / Standard / Detailed) sets a word and
+  section budget, nudged by the video's duration within a strict cap — a 1-hour video
+  no longer produces pages. Cleaner labels; the setting drives all summary paths.
 - **YouTube via Gemini vision.** YouTube now blocks caption downloads (proof-of-origin
   tokens). When captions are unavailable, tldw sends the YouTube URL to Gemini through
   OpenRouter (routed to Google AI Studio, which accepts YouTube links) and Gemini

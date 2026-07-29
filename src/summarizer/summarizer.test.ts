@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSummaryContent, splitIntoBlocks } from './index';
+import { parseSummaryContent, splitIntoBlocks, lengthDirective } from './index';
 import { getTemplate, listTemplates, detectSummaryLocale } from './template';
 
 describe('parseSummaryContent', () => {
@@ -54,6 +54,18 @@ describe('template rendering', () => {
     expect(md).toContain('## Points clés');
     expect(md).toContain('**Méthode:** Sous-titres YouTube');
     expect(md).toContain('- **Terme** — Déf.');
+  });
+
+  it('scales the length budget by duration, capped by detail level', () => {
+    const short = lengthDirective('standard', 10 * 60); // 10 min → low end
+    const long = lengthDirective('standard', 60 * 60); // 60 min → cap
+    expect(short).toContain('3 thematic sections');
+    expect(short).toContain('250 words');
+    expect(long).toContain('5 thematic sections');
+    expect(long).toContain('400 words');
+    // Never balloons: concise stays small even for a very long video.
+    expect(lengthDirective('concise', 120 * 60)).toContain('3 thematic sections');
+    expect(long).toContain('the MORE you compress');
   });
 
   it('detects the summary language from its headings', () => {

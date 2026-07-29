@@ -34,6 +34,40 @@ const DETAIL_HINT: Record<Settings['detailLevel'], string> = {
   detailed: 'Be thorough: develop each section, do not drop any important point.',
 };
 
+/** Word/section budget per detail level: [min→max] scaled by duration. */
+const LENGTH_BUDGET: Record<
+  Settings['detailLevel'],
+  { sMin: number; sMax: number; wBase: number; wCap: number }
+> = {
+  concise: { sMin: 2, sMax: 3, wBase: 100, wCap: 180 },
+  standard: { sMin: 3, sMax: 5, wBase: 250, wCap: 400 },
+  detailed: { sMin: 4, sMax: 7, wBase: 400, wCap: 700 },
+};
+
+/**
+ * Hybrid length control (F7): a budget set by the detail level, nudged by the
+ * video's duration within a capped range. A summary must stay scannable whatever
+ * the length — the longer the video, the more it compresses.
+ */
+export function lengthDirective(
+  level: Settings['detailLevel'],
+  durationSeconds: number | null,
+): string {
+  const b = LENGTH_BUDGET[level];
+  const minutes = durationSeconds && durationSeconds > 0 ? Math.round(durationSeconds / 60) : null;
+  // 0 at ≤10 min, 1 at ≥60 min; unknown duration → mid-low default.
+  const t = minutes == null ? 0.35 : Math.max(0, Math.min(1, (minutes - 10) / 50));
+  const sections = Math.round(b.sMin + (b.sMax - b.sMin) * t);
+  const words = Math.round(b.wBase + (b.wCap - b.wBase) * t);
+  const durNote = minutes ? `This video is about ${minutes} minutes long. ` : '';
+  return (
+    `${durNote}A good summary stays scannable in 1–2 minutes. Target about ${words} words total, ` +
+    `at most ${sections} thematic sections, up to 8 key points, up to 6 glossary terms, up to 5 ` +
+    `takeaways. The longer the video, the MORE you compress: merge related ideas rather than adding ` +
+    `sections, and never exceed these limits.`
+  );
+}
+
 export async function summarize(
   transcript: Transcript,
   settings: Settings,
@@ -57,6 +91,7 @@ export async function summarize(
   const system = [
     `You summarize educational videos. Write ALL summary content in ${languageName}.`,
     detailHint,
+    lengthDirective(settings.detailLevel, transcript.duration),
     template.schemaHint,
   ].join('\n\n');
 
@@ -128,6 +163,7 @@ export async function summarizeYouTubeVideo(
   const system = [
     `You summarize educational videos. Write ALL summary content in ${languageName}.`,
     DETAIL_HINT[settings.detailLevel],
+    lengthDirective(settings.detailLevel, video.duration),
     template.schemaHint,
   ].join('\n\n');
 

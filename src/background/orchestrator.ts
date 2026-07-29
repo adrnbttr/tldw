@@ -13,6 +13,7 @@ import { TldwError, messageFor } from '@/types';
 import { selectAdapter } from '@/adapters';
 import { audioTranscriber } from '@/transcription';
 import { summarize, summarizeYouTubeVideo } from '@/summarizer';
+import { getCatalog, isLocale } from '@/i18n';
 import { getSettings, saveSummary, findCachedSummary } from '@/storage';
 
 /**
@@ -150,11 +151,16 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
 
     const transcript = await extract(video, settings, signal, setStep);
 
-    setStep('summarize', 'active');
     // null transcript → YouTube captions unavailable: Gemini watches the URL.
-    const summary = transcript
-      ? await summarize(transcript, settings, signal)
-      : await summarizeYouTubeVideo(video, settings, signal);
+    let summary: Summary;
+    if (transcript) {
+      setStep('summarize', 'active');
+      summary = await summarize(transcript, settings, signal);
+    } else {
+      const loc = isLocale(settings.uiLanguage) ? settings.uiLanguage : 'en';
+      setStep('summarize', 'active', getCatalog(loc).processing.analyzingVideo);
+      summary = await summarizeYouTubeVideo(video, settings, signal);
+    }
     setStep('summarize', 'done');
 
     await saveSummary(video.provider, video.externalId, summary);
@@ -205,6 +211,8 @@ async function extract(
       // YouTube blocks caption downloads and its media can't be captured — let
       // Gemini watch the video URL instead (null → the video-summary path).
       if (video.provider === 'youtube') {
+        // Recovered seamlessly — don't alarm the user with a red failure.
+        setStep('captions', 'skipped');
         setStep('audio_capture', 'skipped');
         setStep('transcription', 'skipped');
         return null;

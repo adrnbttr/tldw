@@ -43,6 +43,8 @@ export interface Messages {
   processing: {
     back: string;
     steps: Record<JobStep, string>;
+    /** Detail shown while Gemini watches a YouTube video (can take a moment). */
+    analyzingVideo: string;
     failedTitle: string;
     backToList: string;
     cancel: string;
