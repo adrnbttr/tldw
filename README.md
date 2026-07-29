@@ -10,13 +10,7 @@ Runs entirely in your browser, with your own API keys. No backend. No subscripti
 
 <br/>
 
-<table><tr>
-<td><a href="https://github.com/adrnbttr/tldw/actions/workflows/ci.yml"><img src="https://github.com/adrnbttr/tldw/actions/workflows/ci.yml/badge.svg" alt="CI" height="20" /></a></td>
-<td><a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-4f46e5.svg" alt="License: MIT" height="20" /></a></td>
-<td><a href="https://developer.chrome.com/docs/extensions/mv3/intro/"><img src="https://img.shields.io/badge/manifest-v3-4f46e5.svg" alt="Manifest V3" height="20" /></a></td>
-<td><a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/typescript-strict-3178c6.svg" alt="TypeScript" height="20" /></a></td>
-<td><a href="./CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-22c55e.svg" alt="PRs welcome" height="20" /></a></td>
-</tr></table>
+<img src="./.github/assets/badges.svg" alt="CI · MIT License · Manifest V3 · TypeScript · PRs welcome" height="22" />
 
 </div>
 
@@ -47,7 +41,7 @@ Because two summaries from two different extraction paths must read the same, th
 ## Preview
 
 <div align="center">
-  <img src="./.github/assets/popup-mockup.svg" alt="tldw popup: video list on the left, rendered summary with download and copy actions on the right" width="82%" />
+  <img src="./.github/assets/popup-v2.svg" alt="tldw popup: multi-video dashboard on the left, rendered summary with length selector and PDF/Word export on the right" width="82%" />
 </div>
 
 ## Features
