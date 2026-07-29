@@ -7,11 +7,12 @@ import type {
   JobStep,
   JobStepStatus,
   Summary,
+  Transcript,
 } from '@/types';
 import { TldwError, messageFor } from '@/types';
 import { selectAdapter } from '@/adapters';
 import { audioTranscriber } from '@/transcription';
-import { summarize } from '@/summarizer';
+import { summarize, summarizeYouTubeVideo } from '@/summarizer';
 import { getSettings, saveSummary, findCachedSummary } from '@/storage';
 
 /**
@@ -150,7 +151,10 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
     const transcript = await extract(video, settings, signal, setStep);
 
     setStep('summarize', 'active');
-    const summary = await summarize(transcript, settings, signal);
+    // null transcript → YouTube captions unavailable: Gemini watches the URL.
+    const summary = transcript
+      ? await summarize(transcript, settings, signal)
+      : await summarizeYouTubeVideo(video, settings, signal);
     setStep('summarize', 'done');
 
     await saveSummary(video.provider, video.externalId, summary);
@@ -180,7 +184,7 @@ async function extract(
   settings: Awaited<ReturnType<typeof getSettings>>,
   signal: AbortSignal,
   setStep: (step: JobStep, status: JobStepStatus, detail?: string) => void,
-) {
+): Promise<Transcript | null> {
   const adapter = selectAdapter(video);
 
   // Level 1 — captions (only when a provider adapter exists).
@@ -193,11 +197,18 @@ async function extract(
       setStep('transcription', 'skipped');
       return transcript;
     } catch (err) {
-      if (!(err instanceof TldwError) || err.code !== 'NO_CAPTIONS_AVAILABLE') throw err;
+      const noCaptions =
+        err instanceof TldwError &&
+        (err.code === 'NO_CAPTIONS_AVAILABLE' || err.code === 'CAPTIONS_BLOCKED');
+      if (!noCaptions) throw err;
       setStep('captions', 'failed');
-      // YouTube media (googlevideo, signed URLs) can't be captured, so the audio
-      // fallback is futile — surface the caption failure with its diagnostic.
-      if (video.provider === 'youtube') throw err;
+      // YouTube blocks caption downloads and its media can't be captured — let
+      // Gemini watch the video URL instead (null → the video-summary path).
+      if (video.provider === 'youtube') {
+        setStep('audio_capture', 'skipped');
+        setStep('transcription', 'skipped');
+        return null;
+      }
     }
   } else {
     // Native <video> / no caption source: skip straight to the audio fallback.

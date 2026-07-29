@@ -8,6 +8,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **YouTube via Gemini vision.** YouTube now blocks caption downloads (proof-of-origin
+  tokens). When captions are unavailable, tldw sends the YouTube URL to Gemini through
+  OpenRouter (routed to Google AI Studio, which accepts YouTube links) and Gemini
+  watches the video to produce the summary — using the same single OpenRouter key.
+
 - **PDF & Word export.** One-click, nicely formatted **PDF** (primary) and **Word
   (.docx)** documents built from the structured summary — headings, bullet lists,
   bold glossary terms — localized in the output language. Batch export produces a

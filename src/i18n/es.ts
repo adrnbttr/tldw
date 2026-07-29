@@ -75,6 +75,7 @@ export const es: Messages = {
     youtube_captions: 'Subtítulos de YouTube',
     vimeo_captions: 'Subtítulos de Vimeo',
     audio_transcription: 'Transcripción de audio',
+    youtube_video: 'Vídeo de YouTube (Gemini)',
   },
   errors: {
     NO_VIDEO_DETECTED:

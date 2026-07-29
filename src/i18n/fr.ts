@@ -75,6 +75,7 @@ export const fr: Messages = {
     youtube_captions: 'Sous-titres YouTube',
     vimeo_captions: 'Sous-titres Vimeo',
     audio_transcription: 'Transcription audio',
+    youtube_video: 'Vidéo YouTube (Gemini)',
   },
   errors: {
     NO_VIDEO_DETECTED: 'Aucune vidéo trouvée sur cette page. Lancez la lecture puis réessayez.',

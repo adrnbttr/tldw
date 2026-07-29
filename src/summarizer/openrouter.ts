@@ -8,9 +8,13 @@ import { TldwError } from '@/types';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
+/** A multimodal content part (text, or a video URL — e.g. a YouTube link). */
+export type ContentPart =
+  { type: 'text'; text: string } | { type: 'video_url'; video_url: { url: string } };
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  content: string | ContentPart[];
 }
 
 export interface ChatOptions {
@@ -20,11 +24,13 @@ export interface ChatOptions {
   /** Ask the provider to return a JSON object when the model supports it. */
   jsonMode?: boolean;
   temperature?: number;
+  /** OpenRouter provider routing (e.g. force Google AI Studio for YouTube URLs). */
+  provider?: Record<string, unknown>;
   signal?: AbortSignal;
 }
 
 export async function chat(options: ChatOptions): Promise<string> {
-  const { apiKey, model, messages, jsonMode, temperature = 0.3, signal } = options;
+  const { apiKey, model, messages, jsonMode, temperature = 0.3, provider, signal } = options;
 
   if (!apiKey) {
     throw new TldwError('MISSING_OPENROUTER_KEY', 'OpenRouter API key is missing.');
@@ -45,6 +51,7 @@ export async function chat(options: ChatOptions): Promise<string> {
         model,
         messages,
         temperature,
+        ...(provider ? { provider } : {}),
         ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
       }),
       signal,

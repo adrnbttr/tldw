@@ -8,7 +8,8 @@ import type { Provider } from './video';
  * the summarizer only ever sees this shape — which is what guarantees an identical
  * output formalism regardless of the path taken (spec §2.1).
  */
-export type TranscriptSource = 'youtube_captions' | 'vimeo_captions' | 'audio_transcription';
+export type TranscriptSource =
+  'youtube_captions' | 'vimeo_captions' | 'audio_transcription' | 'youtube_video';
 
 export interface TranscriptSegment {
   /** Segment start, in seconds. */

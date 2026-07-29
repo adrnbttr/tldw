@@ -57,6 +57,7 @@ const STRINGS: Record<Locale, Strings> = {
       youtube_captions: 'YouTube captions',
       vimeo_captions: 'Vimeo captions',
       audio_transcription: 'Audio transcription',
+      youtube_video: 'YouTube video (Gemini)',
     },
   },
   fr: {
@@ -73,6 +74,7 @@ const STRINGS: Record<Locale, Strings> = {
       youtube_captions: 'Sous-titres YouTube',
       vimeo_captions: 'Sous-titres Vimeo',
       audio_transcription: 'Transcription audio',
+      youtube_video: 'Vidéo YouTube (Gemini)',
     },
   },
   es: {
@@ -89,6 +91,7 @@ const STRINGS: Record<Locale, Strings> = {
       youtube_captions: 'Subtítulos de YouTube',
       vimeo_captions: 'Subtítulos de Vimeo',
       audio_transcription: 'Transcripción de audio',
+      youtube_video: 'Vídeo de YouTube (Gemini)',
     },
   },
   de: {
@@ -105,6 +108,7 @@ const STRINGS: Record<Locale, Strings> = {
       youtube_captions: 'YouTube-Untertitel',
       vimeo_captions: 'Vimeo-Untertitel',
       audio_transcription: 'Audio-Transkription',
+      youtube_video: 'YouTube-Video (Gemini)',
     },
   },
 };

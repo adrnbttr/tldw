@@ -51,7 +51,7 @@ Because two summaries from two different extraction paths must read the same, th
 ## Features
 
 - 🎯 **Smart detection** — embedded YouTube &amp; Vimeo players, plus any native `<video>` on any site, kept up to date via a `MutationObserver`.
-- 🌍 **Any DRM-free video** — YouTube/Vimeo captions when available, and for everything else (native `<video>` on course platforms, etc.) an audio-transcription fallback. Not just the big two hosts.
+- 🌍 **Any DRM-free video** — captions when available; **YouTube** falls back to Gemini watching the video URL directly; other sites (native `<video>`, course platforms) use an audio-transcription fallback. Not just the big two hosts.
 - 🌐 **Multilingual UI** — English, Français, Español, Deutsch; pick the interface *and* the summary language independently.
 - 🔐 **Works behind authentication** — extraction runs in the tab's own session context.
 - 🪜 **Best-effort cascade** — captions first, audio transcription as a fallback (`ffmpeg.wasm` + Gemini/Whisper), then an explicit typed error. Never a silent failure.

@@ -75,6 +75,7 @@ export const en: Messages = {
     youtube_captions: 'YouTube captions',
     vimeo_captions: 'Vimeo captions',
     audio_transcription: 'Audio transcription',
+    youtube_video: 'YouTube video (Gemini)',
   },
   errors: {
     NO_VIDEO_DETECTED: 'No video found on this page. Start playback, then try again.',

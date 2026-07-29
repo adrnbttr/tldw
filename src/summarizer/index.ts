@@ -1,8 +1,12 @@
-import type { Settings, Summary, SummaryContent, Transcript } from '@/types';
+import type { DetectedVideo, Settings, Summary, SummaryContent, Transcript } from '@/types';
 import { TldwError } from '@/types';
 import { formatDuration, isoDate } from '@/shared/format';
 import { chat } from './openrouter';
 import { getTemplate } from './template';
+
+/** Model + provider that can watch a YouTube URL directly (Gemini on AI Studio). */
+const YOUTUBE_VIDEO_MODEL = 'google/gemini-2.5-flash';
+const YOUTUBE_PROVIDER = { order: ['google-ai-studio'] };
 
 /**
  * Summary generation (F7).
@@ -100,6 +104,74 @@ export async function summarize(
     createdAt: new Date().toISOString(),
     locale: settings.outputLanguage,
     model: settings.summaryModel,
+    content,
+    markdown,
+  };
+}
+
+/**
+ * Summarizes a YouTube video by letting Gemini watch it directly from its URL —
+ * the reliable path now that YouTube blocks caption downloads. Uses the user's
+ * OpenRouter key (routed to Google AI Studio, which accepts YouTube links).
+ */
+export async function summarizeYouTubeVideo(
+  video: DetectedVideo,
+  settings: Settings,
+  signal?: AbortSignal,
+): Promise<Summary> {
+  if (!settings.openRouterKey) {
+    throw new TldwError('MISSING_OPENROUTER_KEY', 'OpenRouter API key is missing.');
+  }
+
+  const template = getTemplate(settings.templateId);
+  const languageName = LANGUAGE_NAMES[settings.outputLanguage] ?? 'English';
+  const system = [
+    `You summarize educational videos. Write ALL summary content in ${languageName}.`,
+    DETAIL_HINT[settings.detailLevel],
+    template.schemaHint,
+  ].join('\n\n');
+
+  const watchUrl = `https://www.youtube.com/watch?v=${video.externalId}`;
+  const raw = await chat({
+    apiKey: settings.openRouterKey,
+    model: YOUTUBE_VIDEO_MODEL,
+    provider: YOUTUBE_PROVIDER,
+    messages: [
+      { role: 'system', content: system },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Watch this video and summarize it.' },
+          { type: 'video_url', video_url: { url: watchUrl } },
+        ],
+      },
+    ],
+    jsonMode: true,
+    signal,
+  });
+
+  const content = parseSummaryContent(raw);
+  const title = video.title ?? 'YouTube video';
+  const durationLabel = formatDuration(video.duration);
+  const markdown = template.render({
+    title,
+    provider: 'youtube',
+    durationLabel,
+    transcriptSource: 'youtube_video',
+    isoDate: isoDate(),
+    locale: settings.outputLanguage,
+    content,
+  });
+
+  return {
+    videoId: video.id,
+    title,
+    provider: 'youtube',
+    durationLabel,
+    transcriptSource: 'youtube_video',
+    createdAt: new Date().toISOString(),
+    locale: settings.outputLanguage,
+    model: YOUTUBE_VIDEO_MODEL,
     content,
     markdown,
   };
