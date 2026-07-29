@@ -41,6 +41,7 @@ export type JobState =
 /** popup → background */
 export type Request =
   | { type: 'LIST_VIDEOS' }
+  | { type: 'RESCAN' }
   | { type: 'GET_JOB_STATE'; videoId: string }
   | { type: 'GET_ACTIVE_JOB' }
   | { type: 'SUMMARIZE'; video: DetectedVideo }

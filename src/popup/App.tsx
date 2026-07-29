@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { Broadcast, DetectedVideo, JobState, Summary, Theme } from '@/types';
+import type { Broadcast, DetectedVideo, DownloadFormat, JobState, Summary, Theme } from '@/types';
 import type { Locale } from '@/i18n';
 import { detectDefaultLocale, getCatalog } from '@/i18n';
 import { I18nContext } from '@/i18n/context';
 import { getSettings } from '@/storage';
 import { applyTheme } from './theme';
-import { listVideos, requestSummary, requestBatch, requestRegenerate } from './messaging';
+import {
+  listVideos,
+  rescanVideos,
+  requestSummary,
+  requestBatch,
+  requestRegenerate,
+} from './messaging';
 import { VideoList } from './components/VideoList';
 import { ResultView } from './components/ResultView';
 import { SettingsView } from './components/SettingsView';
@@ -33,6 +39,8 @@ export function App() {
   const [jobs, setJobs] = useState<Record<string, JobState>>({});
   const [viewing, setViewing] = useState<Viewing | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [rescanning, setRescanning] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>('pdf');
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [onbInitial, setOnbInitial] = useState<{
     uiLanguage: Locale;
@@ -44,6 +52,7 @@ export function App() {
     void getSettings().then((s) => {
       setLocale(s.uiLanguage);
       applyTheme(s.theme);
+      setDownloadFormat(s.downloadFormat);
       setOnboarded(s.onboarded);
       setOnbInitial({
         uiLanguage: s.uiLanguage,
@@ -82,6 +91,13 @@ export function App() {
     if (st?.phase === 'done') setViewing({ summary: st.summary, liveId: videoId });
   };
 
+  const rescan = () => {
+    setRescanning(true);
+    void rescanVideos()
+      .then(setVideos)
+      .finally(() => setRescanning(false));
+  };
+
   // Keep the open result in sync with regeneration (new summary arrives via jobs).
   const shown = viewing
     ? viewing.liveId && jobs[viewing.liveId]?.phase === 'done'
@@ -102,17 +118,20 @@ export function App() {
     }
     if (shown && viewing) {
       const cat = getCatalog(locale);
+      const liveId = viewing.liveId;
       return (
         <ResultView
           summary={shown}
           onBack={() => setViewing(null)}
-          backLabel={viewing.liveId ? cat.nav.videos : cat.history.heading}
+          backLabel={liveId ? cat.nav.videos : cat.history.heading}
+          primaryFormat={downloadFormat}
           regenerating={regenerating}
           onChangeLength={
-            viewing.liveId
+            liveId
               ? (level) => {
                   setRegenerating(true);
-                  void requestRegenerate(shown.videoId, level);
+                  // Target the job id (regeneration cache key), not the summary id.
+                  void requestRegenerate(liveId, level);
                 }
               : undefined
           }
@@ -122,7 +141,11 @@ export function App() {
     if (screen === 'settings') {
       return (
         <SettingsView
-          onClose={() => setScreen('list')}
+          onClose={() => {
+            setScreen('list');
+            // Pick up a changed default export format for the result view.
+            void getSettings().then((s) => setDownloadFormat(s.downloadFormat));
+          }}
           onLocaleChange={setLocale}
           onReplayOnboarding={() => {
             void getSettings().then((s) => {
@@ -150,9 +173,11 @@ export function App() {
       <VideoList
         videos={videos}
         jobs={jobs}
+        rescanning={rescanning}
         onSummarize={summarize}
         onSummarizeAll={summarizeAll}
         onView={openLive}
+        onRescan={rescan}
         onOpenSettings={() => setScreen('settings')}
         onOpenHistory={() => setScreen('history')}
       />

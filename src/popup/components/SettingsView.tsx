@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { DetailLevel, Settings, Theme, TranscriptionProvider } from '@/types';
+import type { DetailLevel, DownloadFormat, Settings, Theme, TranscriptionProvider } from '@/types';
 import { AVAILABLE_MODELS, DEFAULT_SETTINGS } from '@/types';
 import { getSettings, saveSettings } from '@/storage';
 import { listTemplates } from '@/summarizer/template';
@@ -19,6 +19,7 @@ interface Props {
 
 const DETAIL_ORDER: DetailLevel[] = ['concise', 'standard', 'detailed'];
 const THEMES: Theme[] = ['system', 'light', 'dark'];
+const FORMATS: DownloadFormat[] = ['pdf', 'docx'];
 
 export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Props) {
   const t = useI18n();
@@ -176,6 +177,22 @@ export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Pr
           {listTemplates().map((tpl) => (
             <option key={tpl.id} value={tpl.id}>
               {tpl.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label class="field">
+        <span>{t.settings.downloadFormat}</span>
+        <select
+          value={settings.downloadFormat}
+          onChange={(e) =>
+            update('downloadFormat', (e.target as HTMLSelectElement).value as DownloadFormat)
+          }
+        >
+          {FORMATS.map((f) => (
+            <option key={f} value={f}>
+              {t.settings.formatLabels[f]}
             </option>
           ))}
         </select>

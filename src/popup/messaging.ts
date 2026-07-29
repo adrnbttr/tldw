@@ -19,6 +19,12 @@ export async function listVideos(): Promise<DetectedVideo[]> {
   return res.ok && 'videos' in res ? res.videos : [];
 }
 
+/** Forces a fresh detection pass on the active tab and returns the result. */
+export async function rescanVideos(): Promise<DetectedVideo[]> {
+  const res = await send({ type: 'RESCAN' });
+  return res.ok && 'videos' in res ? res.videos : [];
+}
+
 export async function getJobState(videoId: string): Promise<JobState> {
   const res = await send({ type: 'GET_JOB_STATE', videoId });
   return res.ok && 'state' in res ? res.state : { phase: 'idle' };

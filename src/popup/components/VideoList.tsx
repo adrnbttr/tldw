@@ -7,9 +7,11 @@ import { downloadPdfBatch } from '../export-pdf';
 interface Props {
   videos: DetectedVideo[];
   jobs: Record<string, JobState>;
+  rescanning: boolean;
   onSummarize: (video: DetectedVideo) => void;
   onSummarizeAll: (videos: DetectedVideo[]) => void;
   onView: (videoId: string) => void;
+  onRescan: () => void;
   onOpenSettings: () => void;
   onOpenHistory: () => void;
 }
@@ -25,9 +27,11 @@ function providerLabel(p: DetectedVideo['provider'], videoLabel: string): string
 export function VideoList({
   videos,
   jobs,
+  rescanning,
   onSummarize,
   onSummarizeAll,
   onView,
+  onRescan,
   onOpenSettings,
   onOpenHistory,
 }: Props) {
@@ -50,6 +54,14 @@ export function VideoList({
     <div class="screen">
       <header class="topbar">
         <h1>tldw</h1>
+        <button
+          class={`icon-btn ${rescanning ? 'spinning' : ''}`}
+          title={t.list.rescanTooltip}
+          disabled={rescanning}
+          onClick={onRescan}
+        >
+          ⟳
+        </button>
         <button class="icon-btn" title={t.list.historyTooltip} onClick={onOpenHistory}>
           🕘
         </button>

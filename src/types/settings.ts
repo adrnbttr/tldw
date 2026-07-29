@@ -12,6 +12,9 @@ export type TranscriptionProvider = 'openrouter' | 'openai';
 /** Popup appearance: follow the OS, or force light/dark. */
 export type Theme = 'system' | 'light' | 'dark';
 
+/** Default export format featured on a summary. */
+export type DownloadFormat = 'pdf' | 'docx';
+
 /** User preferences and secrets, stored in chrome.storage.local (F9). */
 export interface Settings {
   /** OpenRouter key — summaries, and audio transcription when provider is openrouter. */
@@ -30,6 +33,8 @@ export interface Settings {
   uiLanguage: Locale;
   /** Popup theme (appearance). */
   theme: Theme;
+  /** Export format featured as the primary action on a summary. */
+  downloadFormat: DownloadFormat;
   /** Whether the first-run onboarding has been completed. */
   onboarded: boolean;
   detailLevel: DetailLevel;
@@ -50,6 +55,7 @@ export const DEFAULT_SETTINGS: Settings = {
   outputLanguage: 'en',
   uiLanguage: 'en',
   theme: 'system',
+  downloadFormat: 'pdf',
   onboarded: false,
   detailLevel: 'standard',
   templateId: 'default-v1',

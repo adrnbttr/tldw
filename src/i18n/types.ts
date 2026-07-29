@@ -2,7 +2,7 @@ import type { JobStep } from '@/types/messages';
 import type { DetailLevel } from '@/types/summary';
 import type { TranscriptSource } from '@/types/transcript';
 import type { TldwErrorCode } from '@/types/errors';
-import type { Theme } from '@/types/settings';
+import type { DownloadFormat, Theme } from '@/types/settings';
 
 /**
  * UI localization (i18n).
@@ -29,6 +29,7 @@ export interface Messages {
   list: {
     historyTooltip: string;
     settingsTooltip: string;
+    rescanTooltip: string;
     emptyTitle: string;
     emptyHint: string;
     noTitle: string;
@@ -90,6 +91,8 @@ export interface Messages {
     sectionAppearance: string;
     sectionKeys: string;
     sectionSummary: string;
+    downloadFormat: string;
+    formatLabels: Record<DownloadFormat, string>;
     replayOnboarding: string;
     save: string;
     saved: string;

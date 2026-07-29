@@ -171,31 +171,46 @@ function primeMedia(video: DetectedVideo): void {
   }
 }
 
-chrome.runtime.onMessage.addListener(
-  (message: ContentInbound, _sender, sendResponse: (r: { text: string }) => void) => {
-    if (message.type === 'PRIME_MEDIA') {
-      primeMedia(message.video);
+/**
+ * One-time setup, guarded so the popup can re-inject this file to force a rescan
+ * (e.g. on a tab that was already open when the extension loaded, or an SPA that
+ * mounted its player without a DOM mutation we caught) without stacking a second
+ * observer or message listener. A re-injection just re-scans.
+ */
+const w = window as typeof window & { __tldwReady?: boolean };
+
+if (w.__tldwReady) {
+  // Already set up by a previous injection — force a fresh scan.
+  lastSignature = '';
+  publish();
+} else {
+  w.__tldwReady = true;
+
+  chrome.runtime.onMessage.addListener(
+    (message: ContentInbound, _sender, sendResponse: (r: { text: string }) => void) => {
+      if (message.type === 'PRIME_MEDIA') {
+        primeMedia(message.video);
+        return false;
+      }
+      if (message.type === 'FETCH_TEXT') {
+        // Same-origin fetch from the page context (correct referer/cookies).
+        fetch(message.url, { credentials: 'include' })
+          .then((r) => (r.ok ? r.text() : ''))
+          .then((text) => sendResponse({ text }))
+          .catch(() => sendResponse({ text: '' }));
+        return true; // async response
+      }
       return false;
-    }
-    if (message.type === 'FETCH_TEXT') {
-      // Same-origin fetch from the page context (correct referer/cookies).
-      fetch(message.url, { credentials: 'include' })
-        .then((r) => (r.ok ? r.text() : ''))
-        .then((text) => sendResponse({ text }))
-        .catch(() => sendResponse({ text: '' }));
-      return true; // async response
-    }
-    return false;
-  },
-);
+    },
+  );
 
-publish();
+  publish();
 
-const observer = new MutationObserver(() => {
-  // Debounce bursts of mutations.
-  clearTimeout(debounce);
-  debounce = setTimeout(publish, 400) as unknown as number;
-});
-let debounce = 0 as unknown as number;
-
-observer.observe(document.documentElement, { childList: true, subtree: true });
+  let debounce = 0 as unknown as number;
+  const observer = new MutationObserver(() => {
+    // Debounce bursts of mutations.
+    clearTimeout(debounce);
+    debounce = setTimeout(publish, 400) as unknown as number;
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+}

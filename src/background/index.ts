@@ -60,6 +60,32 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
+    if (message.type === 'RESCAN') {
+      // Force detection on the active tab — re-inject the content script (covers
+      // tabs opened before the extension loaded, where it never ran), then read
+      // the freshly published list.
+      void (async () => {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id == null) {
+          sendResponse({ ok: true, videos: [] });
+          return;
+        }
+        const js = chrome.runtime.getManifest().content_scripts?.[0]?.js ?? [];
+        try {
+          await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: js });
+        } catch {
+          // Restricted page (chrome://, store, …) — nothing we can inject into.
+        }
+        // Give the content script a beat to scan and publish.
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        const cached = videosByTab.get(tab.id) ?? [];
+        const videos = await enrichVideos(cached);
+        videosByTab.set(tab.id, videos);
+        sendResponse({ ok: true, videos });
+      })();
+      return true; // async response
+    }
+
     if (message.type === 'GET_JOB_STATE') {
       sendResponse({ ok: true, state: getJobState(message.videoId) });
       return false;

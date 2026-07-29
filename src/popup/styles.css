@@ -360,6 +360,11 @@ button.secondary {
   }
 }
 
+.icon-btn.spinning {
+  animation: spin 0.8s linear infinite;
+  cursor: default;
+}
+
 .markdown {
   border: 1px solid var(--border);
   border-radius: 10px;
