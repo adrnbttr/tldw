@@ -47,7 +47,7 @@ Because two summaries from two different extraction paths must read the same, th
 ## Preview
 
 <div align="center">
-  <img src="./.github/assets/popup-v2.svg" alt="tldw popup: multi-video dashboard on the left, rendered summary with length selector and PDF/Word export on the right" width="82%" />
+  <img src="./.github/assets/popup-v3.svg" alt="tldw popup: multi-video dashboard on the left, rendered summary with length selector and PDF/Word export on the right" width="82%" />
 </div>
 
 ## Features
