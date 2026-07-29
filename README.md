@@ -10,11 +10,7 @@ Runs entirely in your browser, with your own API keys. No backend. No subscripti
 
 <br/>
 
-[![CI](https://github.com/adrnbttr/tldw/actions/workflows/ci.yml/badge.svg)](https://github.com/adrnbttr/tldw/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-4f46e5.svg)](./LICENSE)
-[![Manifest V3](https://img.shields.io/badge/manifest-v3-4f46e5.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
-[![TypeScript](https://img.shields.io/badge/typescript-strict-3178c6.svg)](https://www.typescriptlang.org/)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-22c55e.svg)](./CONTRIBUTING.md)
+[![CI](https://github.com/adrnbttr/tldw/actions/workflows/ci.yml/badge.svg)](https://github.com/adrnbttr/tldw/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-4f46e5.svg)](./LICENSE) [![Manifest V3](https://img.shields.io/badge/manifest-v3-4f46e5.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/) [![TypeScript](https://img.shields.io/badge/typescript-strict-3178c6.svg)](https://www.typescriptlang.org/) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-22c55e.svg)](./CONTRIBUTING.md)
 
 </div>
 
