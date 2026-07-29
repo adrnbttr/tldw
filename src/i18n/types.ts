@@ -38,6 +38,9 @@ export interface Messages {
     summarizeSelection: (count: number) => string;
     summarizeAll: (count: number) => string;
     view: string;
+    /** Overview line, e.g. "2 videos · 1 summarized". */
+    overview: (total: number, done: number) => string;
+    batchProgress: (done: number, total: number) => string;
   };
   transcription: {
     fetchingMedia: string;

@@ -33,12 +33,18 @@ export function VideoList({
 }: Props) {
   const t = useI18n();
 
-  const doneSummaries: Summary[] = videos
-    .map((v) => jobs[v.id])
+  const states = videos.map((v) => jobs[v.id]);
+  const doneSummaries: Summary[] = states
     .filter((s): s is Extract<JobState, { phase: 'done' }> => s?.phase === 'done')
     .map((s) => s.summary);
+  const doneCount = doneSummaries.length;
+  const runningCount = states.filter((s) => s?.phase === 'running').length;
 
   const pending = videos.filter((v) => treatable(v) && !jobs[v.id]);
+
+  // Global batch progress — shown only while several videos are processing.
+  const batchTotal = doneCount + runningCount;
+  const showBatchBar = runningCount > 0 && batchTotal >= 2;
 
   return (
     <div class="screen">
@@ -60,19 +66,39 @@ export function VideoList({
         </p>
       ) : (
         <>
+          <p class="overview">{t.list.overview(videos.length, doneCount)}</p>
+
+          {showBatchBar && (
+            <div class="batch-progress">
+              <div class="progress-track">
+                <div
+                  class="progress-fill"
+                  style={{ width: `${(doneCount / batchTotal) * 100}%` }}
+                />
+              </div>
+              <span class="batch-count">{t.list.batchProgress(doneCount, batchTotal)}</span>
+            </div>
+          )}
+
           <ul class="video-list">
             {videos.map((video) => {
               const job = jobs[video.id];
               const activeStep =
                 job?.phase === 'running' ? job.steps.find((s) => s.status === 'active') : undefined;
 
+              const isDone = job?.phase === 'done';
               return (
-                <li key={video.id} class="video-item">
+                <li key={video.id} class={`video-item ${isDone ? 'done' : ''}`}>
                   <div class="video-meta">
                     <span class={`badge badge-${video.provider}`}>
                       {providerLabel(video.provider, t.list.videoLabel)}
                     </span>
                     <span class="video-title">{video.title ?? t.list.noTitle}</span>
+                    {isDone && (
+                      <span class="done-check" title="✓">
+                        ✓
+                      </span>
+                    )}
                   </div>
                   <div class="video-sub">
                     {video.duration != null && <span>{formatDuration(video.duration)}</span>}

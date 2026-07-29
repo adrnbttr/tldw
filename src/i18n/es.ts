@@ -14,6 +14,9 @@ export const es: Messages = {
     summarizeSelection: (count) => `Resumir la selección (${count})`,
     summarizeAll: (count) => `Resumir todo (${count})`,
     view: 'Ver',
+    overview: (total, done) =>
+      `${total} vídeo${total > 1 ? 's' : ''}${done > 0 ? ` · ${done} resumido${done > 1 ? 's' : ''}` : ''}`,
+    batchProgress: (done, total) => `${done}/${total}`,
   },
   transcription: {
     fetchingMedia: 'Recuperando el flujo multimedia…',

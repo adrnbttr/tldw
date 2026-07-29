@@ -82,6 +82,30 @@ body {
   padding: 24px 8px;
 }
 
+.overview {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+
+.batch-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.batch-progress .progress-track {
+  flex: 1;
+  margin: 0;
+}
+
+.batch-count {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .video-list {
   list-style: none;
   margin: 0;
@@ -89,6 +113,18 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.video-item.done {
+  border-color: #22c55e55;
+  background: #22c55e0f;
+}
+
+.done-check {
+  color: #22c55e;
+  font-weight: 700;
+  margin-left: auto;
+  flex: none;
 }
 
 .video-item {

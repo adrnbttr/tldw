@@ -14,6 +14,9 @@ export const de: Messages = {
     summarizeSelection: (count) => `Auswahl zusammenfassen (${count})`,
     summarizeAll: (count) => `Alle zusammenfassen (${count})`,
     view: 'Ansehen',
+    overview: (total, done) =>
+      `${total} Video${total > 1 ? 's' : ''}${done > 0 ? ` · ${done} zusammengefasst` : ''}`,
+    batchProgress: (done, total) => `${done}/${total}`,
   },
   transcription: {
     fetchingMedia: 'Medienstream wird abgerufen…',
