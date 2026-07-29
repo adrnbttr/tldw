@@ -13,12 +13,14 @@ interface Props {
   onClose: () => void;
   /** Applies a UI-language change immediately across the popup. */
   onLocaleChange: (locale: Locale) => void;
+  /** Replays the first-launch onboarding wizard. */
+  onReplayOnboarding: () => void;
 }
 
 const DETAIL_ORDER: DetailLevel[] = ['concise', 'standard', 'detailed'];
 const THEMES: Theme[] = ['system', 'light', 'dark'];
 
-export function SettingsView({ onClose, onLocaleChange }: Props) {
+export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Props) {
   const t = useI18n();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
@@ -181,6 +183,10 @@ export function SettingsView({ onClose, onLocaleChange }: Props) {
 
       <button class="primary" onClick={() => void save()}>
         {saved ? t.settings.saved : t.settings.save}
+      </button>
+
+      <button class="link-btn" onClick={onReplayOnboarding}>
+        {t.settings.replayOnboarding}
       </button>
     </div>
   );

@@ -90,6 +90,7 @@ export interface Messages {
     sectionAppearance: string;
     sectionKeys: string;
     sectionSummary: string;
+    replayOnboarding: string;
     save: string;
     saved: string;
   };

@@ -120,7 +120,23 @@ export function App() {
       );
     }
     if (screen === 'settings') {
-      return <SettingsView onClose={() => setScreen('list')} onLocaleChange={setLocale} />;
+      return (
+        <SettingsView
+          onClose={() => setScreen('list')}
+          onLocaleChange={setLocale}
+          onReplayOnboarding={() => {
+            void getSettings().then((s) => {
+              setOnbInitial({
+                uiLanguage: s.uiLanguage,
+                outputLanguage: s.outputLanguage,
+                theme: s.theme,
+              });
+              setScreen('list');
+              setOnboarded(false);
+            });
+          }}
+        />
+      );
     }
     if (screen === 'history') {
       return (

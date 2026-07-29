@@ -69,6 +69,7 @@ export const en: Messages = {
     sectionAppearance: 'Appearance & languages',
     sectionKeys: 'API keys',
     sectionSummary: 'Summary',
+    replayOnboarding: 'Replay the intro',
     save: 'Save',
     saved: 'Saved ✓',
   },

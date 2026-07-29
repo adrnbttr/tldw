@@ -412,6 +412,23 @@ button.secondary {
   font-size: 13px;
 }
 
+.link-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: var(--accent);
+}
+
 .settings-section {
   font-size: 12px;
   text-transform: uppercase;
