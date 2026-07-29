@@ -66,7 +66,21 @@ body {
   flex: 1;
 }
 
-.icon-btn,
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+}
+
 .link {
   background: none;
   border: none;
@@ -370,9 +384,8 @@ button.secondary {
 }
 
 .icon-btn.reload {
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 700;
-  line-height: 1;
   color: var(--muted);
 }
 
