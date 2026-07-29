@@ -61,34 +61,64 @@ export const youtubeAdapter: Adapter = {
   },
 };
 
-// Public "WEB" InnerTube key — stable and used by the site itself.
-const INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
-
 async function fetchCaptionTracks(
   videoId: string,
   diag: string[],
   signal?: AbortSignal,
 ): Promise<CaptionTrack[]> {
-  // InnerTube first (reliable JSON API), then scrape the watch page as a fallback.
+  // Fetch the watch page once: it carries the caption tracks directly, and the
+  // InnerTube key we need if we fall back to the JSON player API.
   // credentials:'include' reuses the user's YouTube session so no consent wall.
-  const viaApi = await fetchViaInnertube(videoId, diag, signal).catch((e) => {
+  const html = await fetchWatchPage(videoId, diag, signal).catch((e) => {
+    diag.push(`watch-err=${e}`);
+    return '';
+  });
+
+  const fromPage =
+    extractPlayerResponse(html)?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  diag.push(`watch-tracks=${fromPage.length}`);
+  if (fromPage.length > 0) return fromPage;
+
+  // Fallback: InnerTube JSON API. Its key is YouTube's public WEB client key,
+  // read from the page at runtime (a value YouTube ships to every browser) — so
+  // no credential is ever hardcoded in this repo.
+  const key = extractInnertubeKey(html);
+  if (!key) {
+    diag.push('no-itk');
+    return [];
+  }
+  return fetchViaInnertube(videoId, key, diag, signal).catch((e) => {
     diag.push(`innertube-err=${e}`);
     return [];
   });
-  if (viaApi.length > 0) return viaApi;
-  return fetchViaWatchPage(videoId, diag, signal).catch((e) => {
-    diag.push(`watch-err=${e}`);
-    return [];
+}
+
+async function fetchWatchPage(
+  videoId: string,
+  diag: string[],
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=en`, {
+    credentials: 'include',
+    signal,
   });
+  diag.push(`watch=${res.status}`);
+  return res.ok ? res.text() : '';
+}
+
+/** Reads YouTube's public WEB InnerTube key from the watch page (not a secret). */
+export function extractInnertubeKey(html: string): string | null {
+  return html.match(/"INNERTUBE_API_KEY":\s*"([^"]+)"/)?.[1] ?? null;
 }
 
 /** YouTube's internal player API — avoids the fragile HTML scrape / consent wall. */
 async function fetchViaInnertube(
   videoId: string,
+  key: string,
   diag: string[],
   signal?: AbortSignal,
 ): Promise<CaptionTrack[]> {
-  const res = await fetch(`https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_KEY}`, {
+  const res = await fetch(`https://www.youtube.com/youtubei/v1/player?key=${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -105,23 +135,6 @@ async function fetchViaInnertube(
   const data = (await res.json()) as PlayerResponse & { playabilityStatus?: { status?: string } };
   const tracks = data.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
   diag.push(`play=${data.playabilityStatus?.status ?? '?'} tracks=${tracks.length}`);
-  return tracks;
-}
-
-async function fetchViaWatchPage(
-  videoId: string,
-  diag: string[],
-  signal?: AbortSignal,
-): Promise<CaptionTrack[]> {
-  const res = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=en`, {
-    credentials: 'include',
-    signal,
-  });
-  diag.push(`watch=${res.status}`);
-  if (!res.ok) return [];
-  const player = extractPlayerResponse(await res.text());
-  const tracks = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
-  diag.push(`watch-tracks=${tracks.length}`);
   return tracks;
 }
 
