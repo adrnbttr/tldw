@@ -64,6 +64,11 @@ export const en: Messages = {
     detailLevel: 'Summary length',
     detailLevels: { concise: 'Short', standard: 'Standard', detailed: 'Detailed' },
     template: 'Summary template',
+    theme: 'Theme',
+    themeLabels: { system: 'System', light: 'Light', dark: 'Dark' },
+    sectionAppearance: 'Appearance & languages',
+    sectionKeys: 'API keys',
+    sectionSummary: 'Summary',
     save: 'Save',
     saved: 'Saved ✓',
   },
@@ -107,5 +112,30 @@ export const en: Messages = {
     UNSUPPORTED_PROVIDER: 'This host is not supported yet.',
     SUMMARY_API_ERROR: 'Generating the summary failed.',
     UNKNOWN: 'An unexpected error occurred.',
+  },
+  onboarding: {
+    next: 'Next',
+    back: 'Back',
+    skip: 'Skip',
+    finish: 'Start using tldw',
+    getStarted: 'Get started',
+    welcomeTitle: 'Welcome to tldw',
+    welcomeBody:
+      'Turn the videos on a page into clean, structured summaries you can read in a minute — YouTube, Vimeo, or any video. Let’s set it up in 30 seconds.',
+    langTitle: 'Your languages',
+    langBody:
+      'Pick the language of the extension and the language your summaries should be written in.',
+    themeTitle: 'Pick a look',
+    themeBody: 'Match your system, or force light or dark.',
+    keyTitle: 'Connect OpenRouter',
+    keyBody:
+      'tldw uses your own OpenRouter key to generate summaries — one account, no subscription, pay only for what you use.',
+    keyCost: 'A summary costs a fraction of a cent. Your key stays on your device.',
+    keyGet: 'Get a free key ↗',
+    keyPlaceholder: 'Paste your OpenRouter key (sk-or-…)',
+    keyLater: 'You can add it later in Settings.',
+    doneTitle: 'You’re all set 🎉',
+    doneBody:
+      'Open a page with a video and click the tldw icon. You can change everything anytime in Settings.',
   },
 };

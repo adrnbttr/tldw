@@ -64,6 +64,11 @@ export const de: Messages = {
     detailLevel: 'Zusammenfassungslänge',
     detailLevels: { concise: 'Kurz', standard: 'Standard', detailed: 'Ausführlich' },
     template: 'Zusammenfassungsvorlage',
+    theme: 'Design',
+    themeLabels: { system: 'System', light: 'Hell', dark: 'Dunkel' },
+    sectionAppearance: 'Aussehen & Sprachen',
+    sectionKeys: 'API-Schlüssel',
+    sectionSummary: 'Zusammenfassung',
     save: 'Speichern',
     saved: 'Gespeichert ✓',
   },
@@ -108,5 +113,31 @@ export const de: Messages = {
     UNSUPPORTED_PROVIDER: 'Dieser Anbieter wird noch nicht unterstützt.',
     SUMMARY_API_ERROR: 'Die Zusammenfassung konnte nicht erstellt werden.',
     UNKNOWN: 'Ein unerwarteter Fehler ist aufgetreten.',
+  },
+  onboarding: {
+    next: 'Weiter',
+    back: 'Zurück',
+    skip: 'Überspringen',
+    finish: 'Loslegen',
+    getStarted: 'Loslegen',
+    welcomeTitle: 'Willkommen bei tldw',
+    welcomeBody:
+      'Verwandle die Videos einer Seite in klare, strukturierte Zusammenfassungen, die in einer Minute lesbar sind — YouTube, Vimeo oder jedes Video. Richten wir es in 30 Sekunden ein.',
+    langTitle: 'Deine Sprachen',
+    langBody:
+      'Wähle die Sprache der Erweiterung und die Sprache, in der deine Zusammenfassungen geschrieben werden.',
+    themeTitle: 'Wähle das Design',
+    themeBody: 'Folge deinem System, oder erzwinge Hell oder Dunkel.',
+    keyTitle: 'OpenRouter verbinden',
+    keyBody:
+      'tldw nutzt deinen eigenen OpenRouter-Schlüssel für die Zusammenfassungen — ein Konto, kein Abo, du zahlst nur, was du nutzt.',
+    keyCost:
+      'Eine Zusammenfassung kostet einen Bruchteil eines Cents. Dein Schlüssel bleibt auf deinem Gerät.',
+    keyGet: 'Kostenlosen Schlüssel holen ↗',
+    keyPlaceholder: 'OpenRouter-Schlüssel einfügen (sk-or-…)',
+    keyLater: 'Du kannst ihn später in den Einstellungen hinzufügen.',
+    doneTitle: 'Alles bereit 🎉',
+    doneBody:
+      'Öffne eine Seite mit einem Video und klicke auf das tldw-Symbol. Du kannst alles jederzeit in den Einstellungen ändern.',
   },
 };

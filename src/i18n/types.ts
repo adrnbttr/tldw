@@ -2,6 +2,7 @@ import type { JobStep } from '@/types/messages';
 import type { DetailLevel } from '@/types/summary';
 import type { TranscriptSource } from '@/types/transcript';
 import type { TldwErrorCode } from '@/types/errors';
+import type { Theme } from '@/types/settings';
 
 /**
  * UI localization (i18n).
@@ -83,6 +84,12 @@ export interface Messages {
     detailLevel: string;
     detailLevels: Record<DetailLevel, string>;
     template: string;
+    theme: string;
+    themeLabels: Record<Theme, string>;
+    /** Section headings. */
+    sectionAppearance: string;
+    sectionKeys: string;
+    sectionSummary: string;
     save: string;
     saved: string;
   };
@@ -100,4 +107,25 @@ export interface Messages {
   };
   sources: Record<TranscriptSource, string>;
   errors: Record<TldwErrorCode, string>;
+  onboarding: {
+    next: string;
+    back: string;
+    skip: string;
+    finish: string;
+    getStarted: string;
+    welcomeTitle: string;
+    welcomeBody: string;
+    langTitle: string;
+    langBody: string;
+    themeTitle: string;
+    themeBody: string;
+    keyTitle: string;
+    keyBody: string;
+    keyCost: string;
+    keyGet: string;
+    keyPlaceholder: string;
+    keyLater: string;
+    doneTitle: string;
+    doneBody: string;
+  };
 }

@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { Broadcast, DetectedVideo, JobState, Summary } from '@/types';
+import type { Broadcast, DetectedVideo, JobState, Summary, Theme } from '@/types';
 import type { Locale } from '@/i18n';
 import { detectDefaultLocale, getCatalog } from '@/i18n';
 import { I18nContext } from '@/i18n/context';
 import { getSettings } from '@/storage';
+import { applyTheme } from './theme';
 import { listVideos, requestSummary, requestBatch, requestRegenerate } from './messaging';
 import { VideoList } from './components/VideoList';
 import { ResultView } from './components/ResultView';
 import { SettingsView } from './components/SettingsView';
 import { HistoryView } from './components/HistoryView';
+import { Onboarding } from './components/Onboarding';
 
 /**
  * Popup root (F2).
@@ -31,9 +33,24 @@ export function App() {
   const [jobs, setJobs] = useState<Record<string, JobState>>({});
   const [viewing, setViewing] = useState<Viewing | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const [onbInitial, setOnbInitial] = useState<{
+    uiLanguage: Locale;
+    outputLanguage: Locale;
+    theme: Theme;
+  }>({ uiLanguage: 'en', outputLanguage: 'en', theme: 'system' });
 
   useEffect(() => {
-    void getSettings().then((s) => setLocale(s.uiLanguage));
+    void getSettings().then((s) => {
+      setLocale(s.uiLanguage);
+      applyTheme(s.theme);
+      setOnboarded(s.onboarded);
+      setOnbInitial({
+        uiLanguage: s.uiLanguage,
+        outputLanguage: s.outputLanguage,
+        theme: s.theme,
+      });
+    });
     void listVideos().then(setVideos);
 
     const onMessage = (msg: Broadcast) => {
@@ -73,6 +90,16 @@ export function App() {
     : null;
 
   const content = () => {
+    if (onboarded === null) return <div class="screen" />; // brief settings load
+    if (!onboarded) {
+      return (
+        <Onboarding
+          initial={onbInitial}
+          onLocaleChange={setLocale}
+          onFinish={() => setOnboarded(true)}
+        />
+      );
+    }
     if (shown && viewing) {
       const cat = getCatalog(locale);
       return (

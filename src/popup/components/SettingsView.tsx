@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { DetailLevel, Settings, TranscriptionProvider } from '@/types';
+import type { DetailLevel, Settings, Theme, TranscriptionProvider } from '@/types';
 import { AVAILABLE_MODELS, DEFAULT_SETTINGS } from '@/types';
 import { getSettings, saveSettings } from '@/storage';
 import { listTemplates } from '@/summarizer/template';
@@ -7,6 +7,7 @@ import type { Locale } from '@/i18n';
 import { SUPPORTED_LOCALES, LOCALE_LABELS, isLocale } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { Breadcrumb } from './Breadcrumb';
+import { applyTheme } from '../theme';
 
 interface Props {
   onClose: () => void;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 const DETAIL_ORDER: DetailLevel[] = ['concise', 'standard', 'detailed'];
+const THEMES: Theme[] = ['system', 'light', 'dark'];
 
 export function SettingsView({ onClose, onLocaleChange }: Props) {
   const t = useI18n();
@@ -30,11 +32,21 @@ export function SettingsView({ onClose, onLocaleChange }: Props) {
     setSaved(false);
   };
 
-  const changeUiLanguage = (value: string) => {
-    if (!isLocale(value)) return;
-    update('uiLanguage', value);
-    onLocaleChange(value); // live preview
-  };
+  const localeSelect = (value: Locale, onPick: (loc: Locale) => void): preact.JSX.Element => (
+    <select
+      value={value}
+      onChange={(e) => {
+        const v = (e.target as HTMLSelectElement).value;
+        if (isLocale(v)) onPick(v);
+      }}
+    >
+      {SUPPORTED_LOCALES.map((loc) => (
+        <option key={loc} value={loc}>
+          {LOCALE_LABELS[loc]}
+        </option>
+      ))}
+    </select>
+  );
 
   const save = async () => {
     await saveSettings(settings);
@@ -47,6 +59,41 @@ export function SettingsView({ onClose, onLocaleChange }: Props) {
       <header class="topbar">
         <Breadcrumb rootLabel={t.nav.videos} current={t.settings.heading} onRoot={onClose} />
       </header>
+
+      <h2 class="settings-section">{t.settings.sectionAppearance}</h2>
+
+      <label class="field">
+        <span>{t.settings.theme}</span>
+        <select
+          value={settings.theme}
+          onChange={(e) => {
+            const th = (e.target as HTMLSelectElement).value as Theme;
+            update('theme', th);
+            applyTheme(th); // live preview
+          }}
+        >
+          {THEMES.map((th) => (
+            <option key={th} value={th}>
+              {t.settings.themeLabels[th]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label class="field">
+        <span>{t.settings.uiLanguage}</span>
+        {localeSelect(settings.uiLanguage, (loc) => {
+          update('uiLanguage', loc);
+          onLocaleChange(loc);
+        })}
+      </label>
+
+      <label class="field">
+        <span>{t.settings.outputLanguage}</span>
+        {localeSelect(settings.outputLanguage, (loc) => update('outputLanguage', loc))}
+      </label>
+
+      <h2 class="settings-section">{t.settings.sectionKeys}</h2>
 
       <label class="field">
         <span>{t.settings.openRouterKey}</span>
@@ -86,6 +133,8 @@ export function SettingsView({ onClose, onLocaleChange }: Props) {
         </label>
       )}
 
+      <h2 class="settings-section">{t.settings.sectionSummary}</h2>
+
       <label class="field">
         <span>{t.settings.model}</span>
         <select
@@ -95,37 +144,6 @@ export function SettingsView({ onClose, onLocaleChange }: Props) {
           {AVAILABLE_MODELS.map((m) => (
             <option key={m.id} value={m.id}>
               {m.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label class="field">
-        <span>{t.settings.uiLanguage}</span>
-        <select
-          value={settings.uiLanguage}
-          onChange={(e) => changeUiLanguage((e.target as HTMLSelectElement).value)}
-        >
-          {SUPPORTED_LOCALES.map((loc) => (
-            <option key={loc} value={loc}>
-              {LOCALE_LABELS[loc]}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label class="field">
-        <span>{t.settings.outputLanguage}</span>
-        <select
-          value={settings.outputLanguage}
-          onChange={(e) => {
-            const v = (e.target as HTMLSelectElement).value;
-            if (isLocale(v)) update('outputLanguage', v);
-          }}
-        >
-          {SUPPORTED_LOCALES.map((loc) => (
-            <option key={loc} value={loc}>
-              {LOCALE_LABELS[loc]}
             </option>
           ))}
         </select>

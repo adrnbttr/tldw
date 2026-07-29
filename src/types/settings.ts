@@ -9,6 +9,9 @@ import type { Locale } from '@/i18n/types';
  */
 export type TranscriptionProvider = 'openrouter' | 'openai';
 
+/** Popup appearance: follow the OS, or force light/dark. */
+export type Theme = 'system' | 'light' | 'dark';
+
 /** User preferences and secrets, stored in chrome.storage.local (F9). */
 export interface Settings {
   /** OpenRouter key — summaries, and audio transcription when provider is openrouter. */
@@ -25,6 +28,10 @@ export interface Settings {
   outputLanguage: Locale;
   /** Language of the extension UI. */
   uiLanguage: Locale;
+  /** Popup theme (appearance). */
+  theme: Theme;
+  /** Whether the first-run onboarding has been completed. */
+  onboarded: boolean;
   detailLevel: DetailLevel;
   /** Active summary template id (versioned). */
   templateId: string;
@@ -42,6 +49,8 @@ export const DEFAULT_SETTINGS: Settings = {
   summaryModel: 'google/gemini-2.5-flash',
   outputLanguage: 'en',
   uiLanguage: 'en',
+  theme: 'system',
+  onboarded: false,
   detailLevel: 'standard',
   templateId: 'default-v1',
   timeoutSeconds: 15 * 60,
