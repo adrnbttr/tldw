@@ -98,7 +98,8 @@ chrome.runtime.onMessage.addListener(
 
     if (message.type === 'SUMMARIZE') {
       // Fire and forget — the job runs in the worker; progress is broadcast.
-      void runJob(message.video, broadcast);
+      // prefetch: warm the other lengths so the length switch is instant.
+      void runJob(message.video, broadcast, undefined, { prefetch: true });
       sendResponse({ ok: true });
       return false;
     }

@@ -317,6 +317,15 @@ button.secondary {
   color: var(--muted);
 }
 
+.length-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
 .segmented {
   display: inline-flex;
   border: 1px solid var(--border);
@@ -358,6 +367,17 @@ button.secondary {
   to {
     transform: rotate(360deg);
   }
+}
+
+.icon-btn.reload {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.icon-btn.reload:hover {
+  color: var(--accent);
 }
 
 .icon-btn.spinning {

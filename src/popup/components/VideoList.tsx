@@ -55,7 +55,7 @@ export function VideoList({
       <header class="topbar">
         <h1>tldw</h1>
         <button
-          class={`icon-btn ${rescanning ? 'spinning' : ''}`}
+          class={`icon-btn reload ${rescanning ? 'spinning' : ''}`}
           title={t.list.rescanTooltip}
           disabled={rescanning}
           onClick={onRescan}

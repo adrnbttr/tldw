@@ -42,6 +42,12 @@ export function ResultView({
   const saveWord = () => void downloadDocx(summary);
   const pdfFirst = primaryFormat === 'pdf';
 
+  // Always resolve to a valid segment so the current length is clearly shown,
+  // even for older cached summaries that predate the detailLevel field.
+  const activeLevel: DetailLevel = LEVELS.includes(summary.detailLevel)
+    ? summary.detailLevel
+    : 'standard';
+
   return (
     <div class="screen">
       <header class="topbar">
@@ -50,28 +56,32 @@ export function ResultView({
 
       <p class="method">{t.result.method(t.sources[summary.transcriptSource])}</p>
 
-      {onChangeLength && (
-        <div class={`length-switch ${regenerating ? 'busy' : ''}`}>
-          <span class="length-label">{t.result.length}</span>
-          <div class="segmented">
-            {LEVELS.map((level) => (
-              <button
-                key={level}
-                class={summary.detailLevel === level ? 'seg active' : 'seg'}
-                disabled={regenerating}
-                onClick={() => level !== summary.detailLevel && onChangeLength(level)}
-              >
-                {t.settings.detailLevels[level]}
-              </button>
-            ))}
-          </div>
-          {regenerating && (
-            <span class="spinner" aria-label="…">
-              ⟳
-            </span>
-          )}
-        </div>
-      )}
+      <div class={`length-switch ${regenerating ? 'busy' : ''}`}>
+        <span class="length-label">{t.result.length}</span>
+        {onChangeLength ? (
+          <>
+            <div class="segmented">
+              {LEVELS.map((level) => (
+                <button
+                  key={level}
+                  class={activeLevel === level ? 'seg active' : 'seg'}
+                  disabled={regenerating}
+                  onClick={() => level !== activeLevel && onChangeLength(level)}
+                >
+                  {t.settings.detailLevels[level]}
+                </button>
+              ))}
+            </div>
+            {regenerating && (
+              <span class="spinner" aria-label="…">
+                ⟳
+              </span>
+            )}
+          </>
+        ) : (
+          <span class="length-value">{t.settings.detailLevels[activeLevel]}</span>
+        )}
+      </div>
 
       <div
         class="markdown"
