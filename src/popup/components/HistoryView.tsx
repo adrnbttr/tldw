@@ -3,6 +3,7 @@ import type { Summary } from '@/types';
 import { getHistory } from '@/storage';
 import { isoDate } from '@/shared/format';
 import { useI18n } from '@/i18n/context';
+import { Breadcrumb } from './Breadcrumb';
 
 interface Props {
   onOpen: (summary: Summary) => void;
@@ -25,10 +26,7 @@ export function HistoryView({ onOpen, onClose }: Props) {
   return (
     <div class="screen">
       <header class="topbar">
-        <button class="link" onClick={onClose}>
-          {t.history.back}
-        </button>
-        <h1>{t.history.heading}</h1>
+        <Breadcrumb rootLabel={t.nav.videos} current={t.history.heading} onRoot={onClose} />
       </header>
 
       {loaded && summaries.length === 0 ? (

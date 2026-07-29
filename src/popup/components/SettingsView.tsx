@@ -6,6 +6,7 @@ import { listTemplates } from '@/summarizer/template';
 import type { Locale } from '@/i18n';
 import { SUPPORTED_LOCALES, LOCALE_LABELS, isLocale } from '@/i18n';
 import { useI18n } from '@/i18n/context';
+import { Breadcrumb } from './Breadcrumb';
 
 interface Props {
   onClose: () => void;
@@ -44,10 +45,7 @@ export function SettingsView({ onClose, onLocaleChange }: Props) {
   return (
     <div class="screen">
       <header class="topbar">
-        <button class="link" onClick={onClose}>
-          {t.settings.back}
-        </button>
-        <h1>{t.settings.heading}</h1>
+        <Breadcrumb rootLabel={t.nav.videos} current={t.settings.heading} onRoot={onClose} />
       </header>
 
       <label class="field">

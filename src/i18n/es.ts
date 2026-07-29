@@ -1,6 +1,7 @@
 import type { Messages } from './types';
 
 export const es: Messages = {
+  nav: { videos: 'Vídeos' },
   list: {
     historyTooltip: 'Historial',
     settingsTooltip: 'Ajustes',

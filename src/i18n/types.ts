@@ -21,6 +21,10 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 };
 
 export interface Messages {
+  /** Breadcrumb / navigation labels. */
+  nav: {
+    videos: string;
+  };
   list: {
     historyTooltip: string;
     settingsTooltip: string;

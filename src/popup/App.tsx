@@ -74,10 +74,12 @@ export function App() {
 
   const content = () => {
     if (shown && viewing) {
+      const cat = getCatalog(locale);
       return (
         <ResultView
           summary={shown}
           onBack={() => setViewing(null)}
+          backLabel={viewing.liveId ? cat.nav.videos : cat.history.heading}
           regenerating={regenerating}
           onChangeLength={
             viewing.liveId

@@ -86,8 +86,8 @@ export function VideoList({
                         {activeStep ? t.processing.steps[activeStep.step] : t.list.summarize}
                         {activeStep?.detail ? ` · ${activeStep.detail}` : ''}
                       </span>
-                      <button class="link danger" onClick={() => void cancel(video.id)}>
-                        ✕
+                      <button class="cancel-link" onClick={() => void cancel(video.id)}>
+                        {t.processing.cancel}
                       </button>
                     </div>
                   ) : job?.phase === 'done' ? (

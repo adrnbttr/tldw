@@ -5,10 +5,13 @@ import { useI18n } from '@/i18n/context';
 import { copyPlainText } from '../export';
 import { downloadDocx } from '../export-docx';
 import { downloadPdf } from '../export-pdf';
+import { Breadcrumb } from './Breadcrumb';
 
 interface Props {
   summary: Summary;
   onBack: () => void;
+  /** Breadcrumb root label — where "back" goes (Videos, or History). */
+  backLabel: string;
   /** Present only for the active result: regenerate at a new length in place. */
   onChangeLength?: (level: DetailLevel) => void;
   regenerating?: boolean;
@@ -16,7 +19,7 @@ interface Props {
 
 const LEVELS: DetailLevel[] = ['concise', 'standard', 'detailed'];
 
-export function ResultView({ summary, onBack, onChangeLength, regenerating }: Props) {
+export function ResultView({ summary, onBack, backLabel, onChangeLength, regenerating }: Props) {
   const t = useI18n();
   const [copied, setCopied] = useState(false);
 
@@ -29,10 +32,7 @@ export function ResultView({ summary, onBack, onChangeLength, regenerating }: Pr
   return (
     <div class="screen">
       <header class="topbar">
-        <button class="link" onClick={onBack}>
-          {t.result.back}
-        </button>
-        <h1>{t.result.heading}</h1>
+        <Breadcrumb rootLabel={backLabel} current={t.result.heading} onRoot={onBack} />
       </header>
 
       <p class="method">{t.result.method(t.sources[summary.transcriptSource])}</p>
