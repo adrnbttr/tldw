@@ -162,38 +162,56 @@ function finalize(lines: string[]): string {
   );
 }
 
+export interface LengthParts {
+  /** Whether the Details (sections) block is shown. */
+  sections: boolean;
+  /** Whether the Terms & concepts (glossary) block is shown. */
+  glossary: boolean;
+  /** Max key points shown (Infinity = all). */
+  keyPoints: number;
+  /** Max takeaways shown (Infinity = all). */
+  takeaways: number;
+}
+
 /**
- * Which parts of the summary a given length renders. The rich JSON always holds
- * everything; length just gates what is shown (and exported), so the three depths
- * are visibly different views of one generation.
- * - concise : In brief · Key points · Takeaways
- * - standard: + Details (sections)
- * - detailed: + Terms & concepts (glossary)
+ * What a given length renders. The rich JSON always holds everything; length gates
+ * both which blocks appear *and* how many items, so the three depths are visibly
+ * distinct views of one generation (shared by the on-screen render and exports).
+ * - concise : brief · a few key points · a few takeaways
+ * - standard: + Details (sections), more points
+ * - detailed: + Terms & concepts (glossary), everything
  */
-export function lengthParts(level: DetailLevel): { sections: boolean; glossary: boolean } {
-  return { sections: level !== 'concise', glossary: level === 'detailed' };
+export function lengthParts(level: DetailLevel): LengthParts {
+  switch (level) {
+    case 'concise':
+      return { sections: false, glossary: false, keyPoints: 4, takeaways: 3 };
+    case 'standard':
+      return { sections: true, glossary: false, keyPoints: 7, takeaways: 5 };
+    default:
+      return { sections: true, glossary: true, keyPoints: Infinity, takeaways: Infinity };
+  }
 }
 
 /** Renders the structured summary to Markdown at the requested length. */
 export function renderSummary(input: RenderInput, level: DetailLevel): string {
   const s = strings(input.locale);
   const { content } = input;
-  const { sections, glossary } = lengthParts(level);
+  const parts = lengthParts(level);
   const lines: string[] = [...header(input, s)];
 
   lines.push(`## ${s.inBrief}`, content.tldr.trim(), '');
   lines.push(`## ${s.keyPoints}`);
-  for (const point of content.keyPoints) lines.push(`- ${point.trim()}`);
+  for (const point of content.keyPoints.slice(0, parts.keyPoints)) lines.push(`- ${point.trim()}`);
   lines.push('');
 
-  if (sections && content.sections.length > 0) {
+  if (parts.sections && content.sections.length > 0) {
     lines.push(`## ${s.development}`);
     for (const section of content.sections) {
       lines.push(`### ${section.heading.trim()}`, section.body.trim(), '');
     }
   }
 
-  if (glossary && content.glossary.length > 0) {
+  if (parts.glossary && content.glossary.length > 0) {
     lines.push(`## ${s.glossary}`);
     for (const { term, definition } of content.glossary) {
       lines.push(`- **${term.trim()}** — ${definition.trim()}`);
@@ -202,7 +220,7 @@ export function renderSummary(input: RenderInput, level: DetailLevel): string {
   }
 
   lines.push(`## ${s.toRemember}`);
-  for (const item of content.takeaways) lines.push(`- ${item.trim()}`);
+  for (const item of content.takeaways.slice(0, parts.takeaways)) lines.push(`- ${item.trim()}`);
   lines.push('');
 
   return finalize(lines);

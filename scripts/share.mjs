@@ -11,7 +11,10 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-const zipName = `tldw-share-v${version}.zip`;
+// --lite drops the 30 MB ffmpeg core (the audio-transcription fallback for
+// captionless native videos) for a much smaller email attachment.
+const lite = process.argv.includes('--lite');
+const zipName = `tldw-share${lite ? '-lite' : ''}-v${version}.zip`;
 const stage = join(root, '.tmp', 'share');
 
 // Bundled notice — the recipient reads this after unzipping (French: written for
@@ -67,10 +70,11 @@ En cas de souci
 console.log('› Building…');
 execSync('npm run build', { cwd: root, stdio: 'inherit' });
 
-console.log('› Staging…');
+console.log(`› Staging…${lite ? ' (lite — no ffmpeg)' : ''}`);
 rmSync(stage, { recursive: true, force: true });
 mkdirSync(join(stage, 'tldw-extension'), { recursive: true });
 cpSync(join(root, 'dist'), join(stage, 'tldw-extension'), { recursive: true });
+if (lite) rmSync(join(stage, 'tldw-extension', 'ffmpeg'), { recursive: true, force: true });
 writeFileSync(join(stage, 'INSTALL.txt'), INSTALL_TXT);
 
 rmSync(join(root, zipName), { force: true });
@@ -85,3 +89,6 @@ execSync(
 rmSync(stage, { recursive: true, force: true });
 
 console.log(`✓ ${zipName} ready — email it to your colleague. See docs/INSTALL.md.`);
+if (lite) {
+  console.log('  (lite build — the audio fallback for captionless native videos is disabled.)');
+}

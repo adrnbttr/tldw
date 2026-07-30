@@ -90,10 +90,25 @@ describe('summary rendering', () => {
     expect(render('detailed', 'de')).toContain('## Kurz gesagt');
   });
 
-  it('gates parts by length', () => {
-    expect(lengthParts('concise')).toEqual({ sections: false, glossary: false });
-    expect(lengthParts('standard')).toEqual({ sections: true, glossary: false });
-    expect(lengthParts('detailed')).toEqual({ sections: true, glossary: true });
+  it('gates blocks and item counts by length', () => {
+    expect(lengthParts('concise')).toEqual({
+      sections: false,
+      glossary: false,
+      keyPoints: 4,
+      takeaways: 3,
+    });
+    expect(lengthParts('standard')).toEqual({
+      sections: true,
+      glossary: false,
+      keyPoints: 7,
+      takeaways: 5,
+    });
+    expect(lengthParts('detailed')).toEqual({
+      sections: true,
+      glossary: true,
+      keyPoints: Infinity,
+      takeaways: Infinity,
+    });
   });
 
   it('concise omits Développement and glossary', () => {
@@ -102,6 +117,27 @@ describe('summary rendering', () => {
     expect(md).toContain('## À retenir');
     expect(md).not.toContain('## Développement');
     expect(md).not.toContain('## Notions');
+  });
+
+  it('caps key points at the concise length', () => {
+    const many = {
+      ...sampleContent,
+      keyPoints: ['a', 'b', 'c', 'd', 'e', 'f'],
+    };
+    const md = renderSummary(
+      {
+        title: 'T',
+        provider: 'youtube',
+        durationLabel: '5 min',
+        transcriptSource: 'youtube_captions',
+        isoDate: '2026-07-24',
+        locale: 'fr',
+        content: many,
+      },
+      'concise',
+    );
+    // concise caps at 4 key points.
+    expect((md.match(/^- [a-f]$/gm) ?? []).length).toBe(4);
   });
 
   it('standard keeps Développement but drops the glossary', () => {

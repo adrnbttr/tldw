@@ -4,8 +4,6 @@ import { renderMarkdown } from '@/shared/markdown';
 import { renderSummary } from '@/summarizer/template';
 import { useI18n } from '@/i18n/context';
 import { copyPlainText } from '../export';
-import { downloadDocx } from '../export-docx';
-import { downloadPdf } from '../export-pdf';
 import { Breadcrumb } from './Breadcrumb';
 
 interface Props {
@@ -58,8 +56,16 @@ export function ResultView({ summary, onBack, backLabel, primaryFormat }: Props)
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const savePdf = () => downloadPdf(view);
-  const saveWord = () => void downloadDocx(view);
+  // Export libraries (jsPDF / docx) are heavy — load them on demand so they never
+  // weigh down the popup's initial bundle.
+  const savePdf = async () => {
+    const { downloadPdf } = await import('../export-pdf');
+    downloadPdf(view);
+  };
+  const saveWord = async () => {
+    const { downloadDocx } = await import('../export-docx');
+    await downloadDocx(view);
+  };
   const pdfFirst = primaryFormat === 'pdf';
 
   return (
@@ -72,11 +78,12 @@ export function ResultView({ summary, onBack, backLabel, primaryFormat }: Props)
 
       <div class="length-switch">
         <span class="length-label">{t.result.length}</span>
-        <div class="segmented">
+        <div class="segmented" role="group" aria-label={t.result.length}>
           {LEVELS.map((lvl) => (
             <button
               key={lvl}
               class={level === lvl ? 'seg active' : 'seg'}
+              aria-pressed={level === lvl}
               onClick={() => setLevel(lvl)}
             >
               {t.settings.detailLevels[lvl]}
@@ -91,11 +98,11 @@ export function ResultView({ summary, onBack, backLabel, primaryFormat }: Props)
         dangerouslySetInnerHTML={{ __html: renderMarkdown(view.markdown) }}
       />
 
-      <button class="primary" onClick={pdfFirst ? savePdf : saveWord}>
+      <button class="primary" onClick={() => void (pdfFirst ? savePdf() : saveWord())}>
         {pdfFirst ? t.result.downloadPdf : t.result.downloadWord}
       </button>
       <div class="actions">
-        <button class="secondary" onClick={pdfFirst ? saveWord : savePdf}>
+        <button class="secondary" onClick={() => void (pdfFirst ? saveWord() : savePdf())}>
           {pdfFirst ? 'Word' : 'PDF'}
         </button>
         <button class="secondary" onClick={() => void copy()}>

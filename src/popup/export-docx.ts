@@ -55,7 +55,7 @@ export function buildDocx(summary: Summary): Document {
   children.push(new Paragraph({ text: c.tldr.trim() }));
 
   children.push(new Paragraph({ text: s.keyPoints, heading: HeadingLevel.HEADING_1 }));
-  children.push(...bullets(c.keyPoints));
+  children.push(...bullets(c.keyPoints.slice(0, parts.keyPoints)));
 
   if (parts.sections && c.sections.length > 0) {
     children.push(new Paragraph({ text: s.development, heading: HeadingLevel.HEADING_1 }));
@@ -83,7 +83,7 @@ export function buildDocx(summary: Summary): Document {
   }
 
   children.push(new Paragraph({ text: s.toRemember, heading: HeadingLevel.HEADING_1 }));
-  children.push(...bullets(c.takeaways));
+  children.push(...bullets(c.takeaways.slice(0, parts.takeaways)));
 
   return new Document({
     styles: {

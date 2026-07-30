@@ -2,7 +2,6 @@ import type { DetectedVideo, JobState, Summary } from '@/types';
 import { formatDuration } from '@/shared/format';
 import { useI18n } from '@/i18n/context';
 import { cancel } from '../messaging';
-import { downloadPdfBatch } from '../export-pdf';
 
 interface Props {
   videos: DetectedVideo[];
@@ -57,15 +56,26 @@ export function VideoList({
         <button
           class={`icon-btn reload ${rescanning ? 'spinning' : ''}`}
           title={t.list.rescanTooltip}
+          aria-label={t.list.rescanTooltip}
           disabled={rescanning}
           onClick={onRescan}
         >
           ⟳
         </button>
-        <button class="icon-btn" title={t.list.historyTooltip} onClick={onOpenHistory}>
+        <button
+          class="icon-btn"
+          title={t.list.historyTooltip}
+          aria-label={t.list.historyTooltip}
+          onClick={onOpenHistory}
+        >
           🕘
         </button>
-        <button class="icon-btn" title={t.list.settingsTooltip} onClick={onOpenSettings}>
+        <button
+          class="icon-btn"
+          title={t.list.settingsTooltip}
+          aria-label={t.list.settingsTooltip}
+          onClick={onOpenSettings}
+        >
           ⚙️
         </button>
       </header>
@@ -160,7 +170,12 @@ export function VideoList({
           )}
 
           {doneSummaries.length > 1 && (
-            <button class="secondary batch-btn" onClick={() => downloadPdfBatch(doneSummaries)}>
+            <button
+              class="secondary batch-btn"
+              onClick={() =>
+                void import('../export-pdf').then((m) => m.downloadPdfBatch(doneSummaries))
+              }
+            >
               {t.batch.downloadAll(doneSummaries.length)}
             </button>
           )}

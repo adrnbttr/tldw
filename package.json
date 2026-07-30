@@ -1,6 +1,6 @@
 {
   "name": "tldw",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser extension that turns web videos — YouTube, Vimeo, or any native HTML5 video — into structured Markdown summaries, even behind a login. Your own API keys, no backend.",
   "license": "MIT",
   "type": "module",
@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "icons": "node scripts/gen-icons.mjs",
     "package": "node scripts/package.mjs",
-    "share": "node scripts/share.mjs"
+    "share": "node scripts/share.mjs",
+    "share:lite": "node scripts/share.mjs --lite"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",

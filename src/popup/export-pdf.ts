@@ -95,7 +95,7 @@ function renderSummary(doc: jsPDF, summary: Summary): void {
   text(c.tldr.trim(), { size: 11, gap: 4 });
 
   heading(s.keyPoints);
-  bullets(c.keyPoints);
+  bullets(c.keyPoints.slice(0, parts.keyPoints));
 
   if (parts.sections && c.sections.length > 0) {
     heading(s.development);
@@ -111,7 +111,7 @@ function renderSummary(doc: jsPDF, summary: Summary): void {
   }
 
   heading(s.toRemember);
-  bullets(c.takeaways);
+  bullets(c.takeaways.slice(0, parts.takeaways));
 }
 
 export function buildPdf(summary: Summary): jsPDF {

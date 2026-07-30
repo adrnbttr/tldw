@@ -117,7 +117,9 @@ then click **↻ reload** on the tldw card in `chrome://extensions`.
 produces `tldw-share-vX.Y.Z.zip`: a ready-to-load **`tldw-extension/`** folder plus
 a plain-language **`INSTALL.txt`**. Email it — the recipient unzips and **Load
 unpacked** the folder, then pastes their own OpenRouter key. Full steps for the
-recipient live in [`docs/INSTALL.md`](./docs/INSTALL.md). _(For a Chrome Web Store
+recipient live in [`docs/INSTALL.md`](./docs/INSTALL.md). Use `npm run share:lite`
+for a ~400 KB archive (drops the 30 MB ffmpeg core — the audio fallback for
+captionless native videos — keeping YouTube/Vimeo intact). _(For a Chrome Web Store
 upload instead, `npm run package` writes a store-ready archive.)_
 
 | Symptom | Fix |
