@@ -106,15 +106,19 @@ git clone https://github.com/adrnbttr/tldw.git && cd tldw && ./install.sh
 2. Open the popup → **⚙️ Settings** → paste your [OpenRouter key](https://openrouter.ai/keys) → **Save**. _(Required — it powers summaries and, by default, transcription. See [Configuration](#configuration).)_
 
 <details>
-<summary>Manual build · updating · another computer · troubleshooting</summary>
+<summary>Manual build · updating · share with a colleague · troubleshooting</summary>
 
 **Manual build** — `npm install && npm run build` (output in `dist/`).
 
 **Updating** — unpacked extensions don't auto-update: `git pull && ./install.sh`,
 then click **↻ reload** on the tldw card in `chrome://extensions`.
 
-**Another computer** — copy the built `dist/` over and Load unpacked, or clone and
-build there. No account needed either way.
+**Share with a colleague (no repo, no build on their side)** — `npm run share`
+produces `tldw-share-vX.Y.Z.zip`: a ready-to-load **`tldw-extension/`** folder plus
+a plain-language **`INSTALL.txt`**. Email it — the recipient unzips and **Load
+unpacked** the folder, then pastes their own OpenRouter key. Full steps for the
+recipient live in [`docs/INSTALL.md`](./docs/INSTALL.md). _(For a Chrome Web Store
+upload instead, `npm run package` writes a store-ready archive.)_
 
 | Symptom | Fix |
 |---|---|

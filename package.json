@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "icons": "node scripts/gen-icons.mjs",
-    "package": "node scripts/package.mjs"
+    "package": "node scripts/package.mjs",
+    "share": "node scripts/share.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",
