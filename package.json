@@ -26,7 +26,7 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "docx": "^9.7.1",
-    "jspdf": "^2.5.2",
+    "jspdf": "^4.2.1",
     "preact": "^10.24.3"
   },
   "devDependencies": {
