@@ -20,6 +20,33 @@ describe('classifyMedia', () => {
   });
 });
 
+describe('classifyMedia — Google Drive', () => {
+  // A Drive video streams from googlevideo.com/videoplayback (mime=video/mp4
+  // served as HTTP range chunks) inside a youtube.googleapis.com embed page.
+  // Neither URL carries a media file extension, so both fall through every
+  // pattern and the audio fallback currently misses Google Drive entirely.
+  const googlevideoUrl =
+    'https://rr3---sn-xxx.googlevideo.com/videoplayback?expire=1&mime=video%2Fmp4&range=0-1048575&itag=18';
+  const embedUrl = 'https://youtube.googleapis.com/embed/?authuser=0';
+
+  it('currently classifies googlevideo videoplayback as unknown', () => {
+    expect(classifyMedia(googlevideoUrl)).toBe('unknown');
+  });
+
+  it('currently classifies the youtube embed page as unknown', () => {
+    expect(classifyMedia(embedUrl)).toBe('unknown');
+  });
+
+  it.fails('should classify googlevideo videoplayback as progressive', () => {
+    // mime=video/mp4 + a range header => a progressive MP4 chunk.
+    expect(classifyMedia(googlevideoUrl)).toBe('progressive');
+  });
+
+  // Alternative design: a dedicated 'googlevideo' MediaKind (no such value
+  // exists yet) would keep Drive chunks distinct from generic progressive MP4s.
+  it.todo('classify videoplayback as a dedicated googlevideo kind');
+});
+
 describe('isMediaUrl', () => {
   it('accepts media, rejects the rest', () => {
     expect(isMediaUrl('https://x/y.m3u8')).toBe(true);
