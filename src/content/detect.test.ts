@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import type { Provider } from '@/types';
 import {
   providerFromUrl,
   externalIdFromUrl,
@@ -8,9 +7,6 @@ import {
   dropRedundantNatives,
   pageVideoFromUrl,
 } from './detect';
-
-// Planned Drive provider name; not in the Provider union yet, hence the casts below.
-const drive = 'drive' as unknown as Provider;
 
 describe('providerFromUrl', () => {
   it('recognizes YouTube hosts', () => {
@@ -25,28 +21,21 @@ describe('providerFromUrl', () => {
     expect(providerFromUrl('https://example.com/video')).toBe('unknown');
   });
 
-  describe('Google Drive (not supported yet)', () => {
-    // Current behavior: none of the Drive URL shapes is recognized today.
-    it('returns unknown for a drive.google.com preview embed', () => {
-      expect(providerFromUrl('https://drive.google.com/file/d/ABC123/preview')).toBe('unknown');
-    });
-    it('returns unknown for a drive.google.com view page', () => {
-      expect(providerFromUrl('https://drive.google.com/file/d/ABC123/view')).toBe('unknown');
-    });
-    it('returns unknown for the youtube.googleapis.com player of Drive videos', () => {
-      expect(providerFromUrl('https://youtube.googleapis.com/embed/?authuser=0')).toBe('unknown');
-    });
-
-    // Desired: these should resolve to a 'drive' provider (externalId = ABC123);
-    // flip it.fails to it when Drive detection lands.
-    it.fails('detects a drive.google.com preview embed as drive', () => {
+  describe('Google Drive', () => {
+    it('detects a drive.google.com preview embed as drive', () => {
       expect(providerFromUrl('https://drive.google.com/file/d/ABC123/preview')).toBe('drive');
     });
-    it.fails('detects a drive.google.com view page as drive', () => {
+    it('detects a drive.google.com view page as drive', () => {
       expect(providerFromUrl('https://drive.google.com/file/d/ABC123/view')).toBe('drive');
     });
-    it.fails('detects the youtube.googleapis.com player of Drive videos as drive', () => {
+    it('detects the youtube.googleapis.com player of Drive videos as drive', () => {
       expect(providerFromUrl('https://youtube.googleapis.com/embed/?authuser=0')).toBe('drive');
+    });
+    it('does not mistake the Drive player for a regular YouTube embed', () => {
+      expect(providerFromUrl('https://www.youtube.com/embed/abc123')).toBe('youtube');
+    });
+    it('ignores drive.google.com pages that are not file view/preview URLs', () => {
+      expect(providerFromUrl('https://drive.google.com/drive/folders/xyz')).toBe('unknown');
     });
   });
 });
@@ -66,12 +55,16 @@ describe('externalIdFromUrl', () => {
   it('extracts Vimeo id', () => {
     expect(externalIdFromUrl('https://player.vimeo.com/video/76979871', 'vimeo')).toBe('76979871');
   });
-  // Desired Drive behavior: the /file/d/{id} path should be the externalId.
-  it.fails('extracts the Drive file id from preview and view URLs', () => {
-    expect(externalIdFromUrl('https://drive.google.com/file/d/ABC123/preview', drive)).toBe(
+  it('extracts the Drive file id from preview and view URLs', () => {
+    expect(externalIdFromUrl('https://drive.google.com/file/d/ABC123/preview', 'drive')).toBe(
       'ABC123',
     );
-    expect(externalIdFromUrl('https://drive.google.com/file/d/ABC123/view', drive)).toBe('ABC123');
+    expect(externalIdFromUrl('https://drive.google.com/file/d/ABC123/view', 'drive')).toBe(
+      'ABC123',
+    );
+  });
+  it('yields no id for the Drive player URL', () => {
+    expect(externalIdFromUrl('https://youtube.googleapis.com/embed/?authuser=0', 'drive')).toBe('');
   });
 });
 
@@ -94,9 +87,16 @@ describe('pageVideoFromUrl', () => {
       externalId: '76979871',
     });
   });
+  it('detects a drive.google.com view page', () => {
+    expect(pageVideoFromUrl('https://drive.google.com/file/d/ABC123/view')).toEqual({
+      provider: 'drive',
+      externalId: 'ABC123',
+    });
+  });
   it('returns null for other pages', () => {
     expect(pageVideoFromUrl('https://example.com/page')).toBeNull();
     expect(pageVideoFromUrl('https://www.youtube.com/feed/subscriptions')).toBeNull();
+    expect(pageVideoFromUrl('https://drive.google.com/drive/folders/xyz')).toBeNull();
   });
 });
 
@@ -109,6 +109,20 @@ describe('dropRedundantNatives', () => {
     const out = dropRedundantNatives(videos);
     expect(out).toHaveLength(1);
     expect(out[0].provider).toBe('youtube');
+  });
+
+  it('drops native videos when a Drive player is present', () => {
+    const videos = [
+      makeDetected({ provider: 'native', duration: 15 }),
+      makeDetected({
+        provider: 'drive',
+        externalId: 'ABC123',
+        iframeSrc: 'https://drive.google.com/file/d/ABC123/preview',
+      }),
+    ];
+    const out = dropRedundantNatives(videos);
+    expect(out).toHaveLength(1);
+    expect(out[0].provider).toBe('drive');
   });
 
   it('keeps native videos when there is no embed', () => {

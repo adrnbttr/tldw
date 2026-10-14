@@ -8,6 +8,7 @@ import type {
 import {
   pickBestCandidate,
   isHlsMaster,
+  isGoogleVideoUrl,
   pickHlsVariant,
   parseHlsMedia,
   parseVimeoMaster,
@@ -15,6 +16,7 @@ import {
 import type { VimeoMaster } from '@/transcription/media';
 import { FfmpegAudio, AUDIO_BYTES_PER_SECOND } from '@/transcription/audio';
 import { planChunks, mergeChunkTranscripts } from '@/transcription/chunker';
+import { planByteRanges } from '@/transcription/ranges';
 import { transcribeAudio } from '@/transcription/whisper';
 import { transcribeViaOpenRouter } from '@/transcription/openrouter-audio';
 import { getCatalog, isLocale } from '@/i18n';
@@ -199,6 +201,13 @@ async function downloadSource(
   }
 
   if (best.kind === 'progressive' || best.kind === 'segment') {
+    // Google Drive: googlevideo serves one whole file as byte ranges; fetch it
+    // block by block (resumable, visible progress) instead of a single request.
+    if (best.kind === 'progressive' && isGoogleVideoUrl(best.url)) {
+      const ranged = await downloadByRanges(best.url, t, progress, diag);
+      if (ranged) return ranged;
+      // Range support broke mid-way — fall back to the single full GET.
+    }
     return fetchBytes(best.url);
   }
 
@@ -237,6 +246,70 @@ async function downloadSource(
   throw new TldwError('MEDIA_NOT_CAPTURABLE', `Unsupported media kind: ${best.kind}.`);
 }
 
+/** Block size for googlevideo range downloads (8–16 MiB sweet spot). */
+const RANGE_BLOCK_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Downloads a googlevideo source in fixed byte ranges (`Range: bytes=a-b`),
+ * concatenating the blocks and reporting progress, so a large file arrives in
+ * resumable chunks instead of one giant request. If the probe shows the server
+ * ignores ranges (200 instead of 206), the response body already IS the whole
+ * file and is returned as-is. Returns null only when range support looked fine
+ * but broke (no usable Content-Range, or a non-206 block mid-download) — the
+ * caller then falls back to a single full GET.
+ */
+async function downloadByRanges(
+  url: string,
+  t: Messages['transcription'],
+  progress: (detail: string) => void,
+  diag: string[],
+): Promise<Uint8Array | null> {
+  // Probe with a 1-byte range: 206 + `Content-Range: bytes 0-0/TOTAL` proves
+  // range support and reveals the total size.
+  const probe = await fetchAuth(url, { Range: 'bytes=0-0' });
+  if (probe.status !== 206) {
+    // Server ignored Range: this very response (200) is the full file — keep it
+    // rather than re-downloading everything with a second full-GET fallback.
+    diag.push('ranges unsupported → single fetch');
+    return new Uint8Array(await probe.arrayBuffer());
+  }
+  await probe.arrayBuffer(); // 1-byte probe body — release the connection.
+  const totalBytes = Number(
+    probe.headers.get('content-range')?.match(/^bytes \d+-\d+\/(\d+)$/i)?.[1],
+  );
+  if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
+    diag.push('ranges no total → full fetch');
+    return null;
+  }
+
+  const ranges = planByteRanges(totalBytes, RANGE_BLOCK_BYTES);
+  diag.push(`ranges total=${mb(totalBytes)}MB blocks=${ranges.length}`);
+
+  const parts: Uint8Array[] = [];
+  for (const [start, end] of ranges) {
+    const res = await fetchAuth(url, { Range: `bytes=${start}-${end}` });
+    if (res.status !== 206) {
+      diag.push(`range status=${res.status} → full fetch`);
+      return null;
+    }
+    const block = new Uint8Array(await res.arrayBuffer());
+    if (block.byteLength !== end - start + 1) {
+      throw new TldwError(
+        'MEDIA_NOT_CAPTURABLE',
+        `Range ${start}-${end} returned ${block.byteLength} bytes.`,
+      );
+    }
+    parts.push(block);
+    progress(t.downloading(mb(end + 1), mb(totalBytes)));
+  }
+  return concat(parts);
+}
+
+/** Rounds a byte count to MiB with one decimal (progress labels, diagnostics). */
+function mb(bytes: number): number {
+  return Math.round((bytes / (1024 * 1024)) * 10) / 10;
+}
+
 /** Reconstructs a playable fMP4 from a Vimeo DASH master.json (init + segments). */
 async function downloadVimeoMaster(
   masterUrl: string,
@@ -272,8 +345,8 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
-async function fetchAuth(url: string): Promise<Response> {
-  const res = await fetch(url, { credentials: 'include' });
+async function fetchAuth(url: string, headers?: Record<string, string>): Promise<Response> {
+  const res = await fetch(url, { credentials: 'include', headers });
   if (!res.ok) {
     if (res.status === 403 || res.status === 401) {
       throw new TldwError('MEDIA_PROTECTED', `Media request returned ${res.status}.`);

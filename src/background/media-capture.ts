@@ -1,5 +1,5 @@
 import type { MediaCandidate, MediaKind } from '@/transcription/media';
-import { classifyMedia, isMediaUrl } from '@/transcription/media';
+import { classifyMedia, isMediaUrl, normalizeMediaUrl } from '@/transcription/media';
 
 /**
  * Media segment capture (F5.1).
@@ -22,8 +22,12 @@ interface TabCapture {
 
 const captured = new Map<number, TabCapture>();
 
-function record(tabId: number, url: string): void {
-  if (tabId < 0 || !isMediaUrl(url)) return;
+function record(tabId: number, rawUrl: string): void {
+  if (tabId < 0) return;
+  // Strip byte-range params (googlevideo chunks) so all requests for the same
+  // file land on one "whole file" URL and de-duplicate against each other.
+  const url = normalizeMediaUrl(rawUrl);
+  if (!isMediaUrl(url)) return;
   const kind = classifyMedia(url);
   const entry = captured.get(tabId) ?? { manifests: [], segments: [] };
   const bucket = MANIFEST_KINDS.has(kind) ? entry.manifests : entry.segments;

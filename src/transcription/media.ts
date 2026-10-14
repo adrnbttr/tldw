@@ -19,10 +19,19 @@ const DASH = /\.mpd(\?|$)/i;
 const PROGRESSIVE = /\.mp4(\?|$)/i;
 const SEGMENT = /(\.ts|\.m4s|segment|vimeocdn\.com\/.*\/(?:audio|video))/i;
 
+// Google Drive / YouTube serve media from googlevideo.com/videoplayback as byte
+// ranges of a whole file: no file extension, the `mime` query param carries the
+// content type (video/mp4, audio/mp4, …). Only genuine media mimes are kept, so
+// non-media videoplayback requests stay `unknown`.
+const GOOGLEVIDEO = /googlevideo\.com\/videoplayback(\?|$)/i;
+const MEDIA_MIME = /[?&]mime=(?:audio|video)(?:%2f|\/)/i;
+const AUDIO_MIME = /[?&]mime=audio(?:%2f|\/)/i;
+
 export function classifyMedia(url: string): MediaKind {
   if (VIMEO_MASTER.test(url)) return 'vimeo_master';
   if (HLS.test(url)) return 'hls';
   if (DASH.test(url)) return 'dash';
+  if (GOOGLEVIDEO.test(url) && MEDIA_MIME.test(url)) return 'progressive';
   if (PROGRESSIVE.test(url)) return 'progressive';
   if (SEGMENT.test(url)) return 'segment';
   return 'unknown';
@@ -33,12 +42,48 @@ export function isMediaUrl(url: string): boolean {
   return classifyMedia(url) !== 'unknown';
 }
 
+/** True for googlevideo /videoplayback URLs (Google Drive / YouTube media). */
+export function isGoogleVideoUrl(url: string): boolean {
+  return GOOGLEVIDEO.test(url);
+}
+
+/** Byte-range params googlevideo adds to every chunk request of one file. */
+const RANGE_PARAMS = new Set(['range', 'rn', 'rbuf']);
+
+/**
+ * Strips the byte-range query params (`range`, `rn`, `rbuf`) googlevideo adds to
+ * each chunk request, so every chunk of the same file normalizes to one
+ * "whole file" URL and de-duplicates against it. Param names match
+ * case-insensitively; everything else is preserved verbatim.
+ */
+export function normalizeMediaUrl(url: string): string {
+  const hashAt = url.indexOf('#');
+  const hash = hashAt === -1 ? '' : url.slice(hashAt);
+  const body = hashAt === -1 ? url : url.slice(0, hashAt);
+  const queryAt = body.indexOf('?');
+  if (queryAt === -1) return url;
+  const params = body
+    .slice(queryAt + 1)
+    .split('&')
+    .filter((p) => !RANGE_PARAMS.has(p.split('=', 1)[0].toLowerCase()));
+  const base = body.slice(0, queryAt);
+  return params.length > 0 ? `${base}?${params.join('&')}${hash}` : `${base}${hash}`;
+}
+
+/** True for URLs that stream an audio-only track (e.g. a googlevideo audio itag). */
+export function isAudioOnlyUrl(url: string): boolean {
+  return AUDIO_MIME.test(url);
+}
+
 /**
  * Picks the best source to work from. Preference order:
  *   progressive MP4  (single file, easiest to extract audio from)
  *   HLS playlist     (segment list we can assemble)
  *   DASH manifest
  *   raw segment      (last resort)
+ *
+ * Ties within a kind are broken toward an audio-only stream (e.g. a googlevideo
+ * audio itag instead of its video twin): transcription only needs the audio.
  */
 const KIND_RANK: Record<MediaKind, number> = {
   vimeo_master: 6,
@@ -51,7 +96,11 @@ const KIND_RANK: Record<MediaKind, number> = {
 
 export function pickBestCandidate(candidates: MediaCandidate[]): MediaCandidate | null {
   if (candidates.length === 0) return null;
-  return [...candidates].sort((a, b) => KIND_RANK[b.kind] - KIND_RANK[a.kind])[0];
+  return [...candidates].sort((a, b) => {
+    const byKind = KIND_RANK[b.kind] - KIND_RANK[a.kind];
+    if (byKind !== 0) return byKind;
+    return Number(isAudioOnlyUrl(b.url)) - Number(isAudioOnlyUrl(a.url));
+  })[0];
 }
 
 function resolveUri(uri: string, playlistUrl: string): string {

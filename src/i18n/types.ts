@@ -48,6 +48,8 @@ export interface Messages {
     fetchingMedia: string;
     extractingAudio: string;
     assembling: (index: number, total: number) => string;
+    /** Range-download progress, sizes in MB, e.g. "Downloaded 8/24.6 MB". */
+    downloading: (done: number, total: number) => string;
     transcribing: (index: number, total: number, clock: string) => string;
     transcribingOne: string;
   };

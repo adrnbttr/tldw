@@ -23,6 +23,7 @@ export const es: Messages = {
     fetchingMedia: 'Recuperando el flujo multimedia…',
     extractingAudio: 'Extrayendo la pista de audio…',
     assembling: (index, total) => `Segmentos ${index}/${total}`,
+    downloading: (done, total) => `Descargado ${done}/${total} MB`,
     transcribing: (index, total, clock) => `${index}/${total} · ${clock}`,
     transcribingOne: 'Transcribiendo…',
   },

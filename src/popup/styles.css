@@ -202,6 +202,11 @@ body {
   color: #1ab7ea;
 }
 
+.badge-drive {
+  background: #0f9d5822;
+  color: #0f9d58;
+}
+
 button.primary {
   background: var(--accent);
   color: var(--accent-fg);

@@ -14,6 +14,7 @@ function cleanTitle(title: string): string {
   return title
     .replace(/\s*[-–|]\s*YouTube\s*$/i, '')
     .replace(/\s+on Vimeo\s*$/i, '')
+    .replace(/\s*[-–|]\s*Google Drive\s*$/i, '')
     .trim();
 }
 
@@ -21,9 +22,21 @@ function cleanTitle(title: string): string {
  * Content script (F1).
  *
  * Scans the page for videos on load and on every DOM mutation, then pushes the
- * de-duplicated list to the background. Cross-origin iframes are never accessed —
- * only their `src` is read to derive the provider and external id (spec §3.1).
+ * de-duplicated list to the background. Cross-origin iframes are never accessed
+ * from the outside — only their `src` is read to derive the provider and external
+ * id (spec §3.1). The manifest additionally injects this script into Google
+ * Drive's own frames (drive.google.com, youtube.googleapis.com), where the
+ * player's `<video>` lives, so it can be driven for media capture.
  */
+
+/**
+ * True in an iframe (the Drive player frames above). Sub-frames never publish
+ * detections — the top frame already derives the embed entry from the iframe
+ * `src`, and a sub-frame publish would overwrite the tab's list with duplicates
+ * (VIDEOS_DETECTED is stored per tab, not per frame). Sub-frames only answer
+ * PRIME_MEDIA so their cross-origin `<video>` can be driven.
+ */
+const isSubframe = window.self !== window.top;
 
 /** Direct http(s) media URL of a native video, or null for MSE/blob streams. */
 function nativeMediaSrc(video: HTMLVideoElement): string | null {
@@ -106,6 +119,8 @@ function scan(): DetectedVideo[] {
 let lastSignature = '';
 
 function publish(): void {
+  // Only the top frame publishes — see `isSubframe`.
+  if (isSubframe) return;
   const videos = scan();
   const signature = videos.map((v) => `${v.provider}:${v.externalId}`).join('|');
   if (signature === lastSignature) return;
@@ -118,6 +133,26 @@ function publish(): void {
 }
 
 /**
+ * Briefly plays the frame's first `<video>` (muted) so its media requests fire
+ * and the background can capture them — sparing the user from starting playback
+ * manually. Best-effort: browser autoplay policies may still require a real user
+ * gesture.
+ */
+function playFirstVideoMuted(): void {
+  const el = document.querySelector('video');
+  if (!el) return;
+  el.muted = true;
+  void el.play().catch(() => {});
+  window.setTimeout(() => {
+    try {
+      el.pause();
+    } catch {
+      /* ignore */
+    }
+  }, 4000);
+}
+
+/**
  * Briefly plays the target video (muted) so its media requests fire and the
  * background can capture them — sparing the user from starting playback manually.
  * Best-effort: browser autoplay policies may still require a real user gesture.
@@ -125,17 +160,19 @@ function publish(): void {
 function primeMedia(video: DetectedVideo): void {
   try {
     if (video.provider === 'native') {
-      const el = document.querySelector('video');
-      if (!el) return;
-      el.muted = true;
-      void el.play().catch(() => {});
-      window.setTimeout(() => {
-        try {
-          el.pause();
-        } catch {
-          /* ignore */
-        }
-      }, 4000);
+      // Native videos are only detected in the top frame — prime it there.
+      if (!isSubframe) playFirstVideoMuted();
+      return;
+    }
+
+    if (video.provider === 'drive') {
+      // Drive's player is cross-origin from the host page: the manifest injects
+      // this script into Drive's own frames, and PRIME_MEDIA is broadcast to
+      // every frame of the tab — so whichever frame hosts the `<video>` (the
+      // drive.google.com preview frame or the nested youtube.googleapis.com
+      // player) drives it. Elsewhere the player stays out of reach and this is
+      // a harmless no-op.
+      if (providerFromUrl(location.href) === 'drive') playFirstVideoMuted();
       return;
     }
 
@@ -192,8 +229,11 @@ if (w.__tldwReady) {
         primeMedia(message.video);
         return false;
       }
-      if (message.type === 'FETCH_TEXT') {
+      if (message.type === 'FETCH_TEXT' && !isSubframe) {
         // Same-origin fetch from the page context (correct referer/cookies).
+        // Top frame only: the page's origin — so exactly one fetch happens even
+        // though this script also runs inside Drive's iframes, and a sub-frame
+        // (drive.google.com origin) never races its own response in.
         fetch(message.url, { credentials: 'include' })
           .then((r) => (r.ok ? r.text() : ''))
           .then((text) => sendResponse({ text }))
@@ -206,11 +246,14 @@ if (w.__tldwReady) {
 
   publish();
 
-  let debounce = 0 as unknown as number;
-  const observer = new MutationObserver(() => {
-    // Debounce bursts of mutations.
-    clearTimeout(debounce);
-    debounce = setTimeout(publish, 400) as unknown as number;
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  if (!isSubframe) {
+    // Sub-frames never publish (see `isSubframe`) — no observer needed there.
+    let debounce = 0 as unknown as number;
+    const observer = new MutationObserver(() => {
+      // Debounce bursts of mutations.
+      clearTimeout(debounce);
+      debounce = setTimeout(publish, 400) as unknown as number;
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
 }

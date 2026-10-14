@@ -23,6 +23,7 @@ export const en: Messages = {
     fetchingMedia: 'Fetching the media stream…',
     extractingAudio: 'Extracting the audio track…',
     assembling: (index, total) => `Segments ${index}/${total}`,
+    downloading: (done, total) => `Downloaded ${done}/${total} MB`,
     transcribing: (index, total, clock) => `${index}/${total} · ${clock}`,
     transcribingOne: 'Transcribing…',
   },

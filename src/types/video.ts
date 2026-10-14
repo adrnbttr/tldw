@@ -4,7 +4,7 @@
  * The content script never accesses the *contents* of a cross-origin iframe — it
  * only reads the iframe `src` to derive the provider and external id.
  */
-export type Provider = 'youtube' | 'vimeo' | 'native' | 'unknown';
+export type Provider = 'youtube' | 'vimeo' | 'drive' | 'native' | 'unknown';
 
 export interface DetectedVideo {
   /** Stable id generated locally for this detection (crypto.randomUUID). */

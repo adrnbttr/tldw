@@ -45,6 +45,18 @@ export default defineManifest({
       run_at: 'document_idle',
       all_frames: false,
     },
+    // Drive's player is nested cross-origin (host page → drive.google.com →
+    // youtube.googleapis.com): run there too so the player's <video> is reachable
+    // (PRIME_MEDIA can drive it). Targeted at Drive's hosts only, so irrelevant
+    // iframes never run the script; sub-frames never publish detections (see
+    // `isSubframe` in src/content/index.ts), so they can neither duplicate nor
+    // clobber the top frame's list. host_permissions stays as-is.
+    {
+      matches: ['https://drive.google.com/*', 'https://youtube.googleapis.com/*'],
+      js: ['src/content/index.ts'],
+      run_at: 'document_idle',
+      all_frames: true,
+    },
   ],
   permissions: ['storage', 'activeTab', 'scripting', 'downloads', 'webRequest', 'offscreen'],
   host_permissions: ['<all_urls>'],

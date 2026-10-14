@@ -20,6 +20,7 @@ const treatable = (v: DetectedVideo) => v.provider !== 'unknown';
 function providerLabel(p: DetectedVideo['provider'], videoLabel: string): string {
   if (p === 'youtube') return 'YouTube';
   if (p === 'vimeo') return 'Vimeo';
+  if (p === 'drive') return 'Drive';
   return videoLabel;
 }
 

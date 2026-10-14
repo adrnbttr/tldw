@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   classifyMedia,
+  isAudioOnlyUrl,
+  isGoogleVideoUrl,
   isMediaUrl,
+  normalizeMediaUrl,
   pickBestCandidate,
   resolveSegmentUrls,
   isHlsMaster,
@@ -23,23 +26,37 @@ describe('classifyMedia', () => {
 describe('classifyMedia — Google Drive', () => {
   // A Drive video streams from googlevideo.com/videoplayback (mime=video/mp4
   // served as HTTP range chunks) inside a youtube.googleapis.com embed page.
-  // Neither URL carries a media file extension, so both fall through every
-  // pattern and the audio fallback currently misses Google Drive entirely.
+  // Neither URL carries a media file extension: the googlevideo chunks are
+  // recognized via host + mime param, the embed page itself stays unknown.
   const googlevideoUrl =
     'https://rr3---sn-xxx.googlevideo.com/videoplayback?expire=1&mime=video%2Fmp4&range=0-1048575&itag=18';
   const embedUrl = 'https://youtube.googleapis.com/embed/?authuser=0';
 
-  it('currently classifies googlevideo videoplayback as unknown', () => {
-    expect(classifyMedia(googlevideoUrl)).toBe('unknown');
+  it('classifies googlevideo videoplayback as progressive', () => {
+    // mime=video/mp4 + a range header => a progressive MP4 chunk.
+    expect(classifyMedia(googlevideoUrl)).toBe('progressive');
   });
 
-  it('currently classifies the youtube embed page as unknown', () => {
+  it('classifies googlevideo audio itags as progressive too', () => {
+    expect(
+      classifyMedia('https://rr3---sn-xxx.googlevideo.com/videoplayback?mime=audio%2Fmp4&itag=140'),
+    ).toBe('progressive');
+  });
+
+  it('leaves googlevideo requests without a media mime unknown', () => {
+    expect(classifyMedia('https://rr3---sn-xxx.googlevideo.com/videoplayback?expire=1')).toBe(
+      'unknown',
+    );
+  });
+
+  it('still classifies the youtube embed page as unknown', () => {
     expect(classifyMedia(embedUrl)).toBe('unknown');
   });
 
-  it.fails('should classify googlevideo videoplayback as progressive', () => {
-    // mime=video/mp4 + a range header => a progressive MP4 chunk.
-    expect(classifyMedia(googlevideoUrl)).toBe('progressive');
+  it('flags googlevideo URLs (normalized or not) for the range download path', () => {
+    expect(isGoogleVideoUrl(googlevideoUrl)).toBe(true);
+    expect(isGoogleVideoUrl(normalizeMediaUrl(googlevideoUrl))).toBe(true);
+    expect(isGoogleVideoUrl(embedUrl)).toBe(false);
   });
 
   // Alternative design: a dedicated 'googlevideo' MediaKind (no such value
@@ -50,7 +67,47 @@ describe('classifyMedia — Google Drive', () => {
 describe('isMediaUrl', () => {
   it('accepts media, rejects the rest', () => {
     expect(isMediaUrl('https://x/y.m3u8')).toBe(true);
+    expect(
+      isMediaUrl('https://rr3---sn-xxx.googlevideo.com/videoplayback?mime=video%2Fmp4&range=0-1'),
+    ).toBe(true);
     expect(isMediaUrl('https://x/style.css')).toBe(false);
+  });
+});
+
+describe('normalizeMediaUrl', () => {
+  // A realistic googlevideo chunk URL (tokens kept short on purpose).
+  const chunk =
+    'https://rr3---sn-xxx.googlevideo.com/videoplayback?expire=1&itag=18&mime=video%2Fmp4&range=0-1048575&rn=3&rbuf=0&key=ck2';
+
+  it('strips range/rn/rbuf and preserves everything else verbatim', () => {
+    expect(normalizeMediaUrl(chunk)).toBe(
+      'https://rr3---sn-xxx.googlevideo.com/videoplayback?expire=1&itag=18&mime=video%2Fmp4&key=ck2',
+    );
+  });
+
+  it('maps every byte-range chunk of one file to the same whole-file URL', () => {
+    const first = normalizeMediaUrl(chunk);
+    const second = normalizeMediaUrl(
+      'https://rr3---sn-xxx.googlevideo.com/videoplayback?expire=1&itag=18&mime=video%2Fmp4&range=1000000-1999999&rn=7&rbuf=942080&key=ck2',
+    );
+    expect(second).toBe(first);
+  });
+
+  it('matches param names case-insensitively and drops an emptied query', () => {
+    expect(normalizeMediaUrl('https://x/videoplayback?Range=0-1&Rn=3&RBUF=0')).toBe(
+      'https://x/videoplayback',
+    );
+  });
+
+  it('returns URLs without a query unchanged', () => {
+    expect(normalizeMediaUrl('https://x/y.mp4')).toBe('https://x/y.mp4');
+  });
+});
+
+describe('isAudioOnlyUrl', () => {
+  it('detects audio-mime stream URLs only', () => {
+    expect(isAudioOnlyUrl('https://x/videoplayback?mime=audio%2Fmp4&itag=140')).toBe(true);
+    expect(isAudioOnlyUrl('https://x/videoplayback?mime=video%2Fmp4&itag=18')).toBe(false);
   });
 });
 
@@ -65,6 +122,13 @@ describe('pickBestCandidate', () => {
   });
   it('returns null when empty', () => {
     expect(pickBestCandidate([])).toBeNull();
+  });
+  it('prefers the audio-only stream when kinds tie', () => {
+    const best = pickBestCandidate([
+      { url: 'https://x/videoplayback?mime=video%2Fmp4&itag=18', kind: 'progressive' },
+      { url: 'https://x/videoplayback?mime=audio%2Fmp4&itag=140', kind: 'progressive' },
+    ]);
+    expect(best?.url).toContain('mime=audio');
   });
 });
 
