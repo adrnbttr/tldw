@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 ---
 # Plan: Comprendre pourquoi une vidéo d'1 h hébergée sur Google Drive n'est jamais résumée
 
@@ -34,4 +34,4 @@ status: todo
 - [x] 4.2 Fiabiliser les appels de transcription OpenRouter : réduire la taille de morceau (ex. 10-15 min, via `maxBytes`/`maxChunkSeconds` dans `chunker.ts`), `max_tokens` explicite, retry avec backoff sur 5xx/réseau, timeout par morceau ; concaténation des texte en ordre [implementer] — recette : `npx vitest run src/transcription/chunker.test.ts src/transcription/openrouter-audio.test.ts` (nouveaux cas : retry, découpage 1 h → N morceaux ≤ taille cible) ; `npx tsc --noEmit`
 - [x] 4.3 Timeout et reprise : séparer le délai de téléchargement/extraction de celui de transcription, rendre `timeoutSeconds` proportionnel à la durée de la vidéo (`src/transcription/index.ts`, `src/types/settings.ts`), et persister l'état du job dans `chrome.storage.session` pour survivre à un redémarrage du service worker (`src/background/orchestrator.ts`) ; afficher dans le popup l'étape et le détail courants quand ça « tourne » (`src/popup`, i18n en/fr/es/de) [implementer] — recette : `npx vitest run` ; `npx tsc --noEmit` ; `npm run lint` ; `npm run build`
 - [ ] 4.4 Validation visuelle du popup en erreur / progression longue (états « téléchargement X/Y Mo », « transcription 2/5 », message d'échec typé) sur une page de test locale servant un `<video>` MP4 [visual] — recette : `npm run build` puis chargement de `dist/` dans le Chrome for Testing de Playwright ; captures du popup à chaque étape sans texte tronqué
-- [ ] 4.5 Revue finale d'architecture et de non-régression (YouTube/Vimeo/native intacts) [challenger] — recette : `npm test && npx tsc --noEmit && npm run lint && npm run build` verts ; rapport de revue sans point bloquant ; puis passer `status: done`, déplacer le plan dans `.opencode/plans/done/` et commit
+- [x] 4.5 Revue finale d'architecture et de non-régression (YouTube/Vimeo/native intacts) [challenger] — recette : `npm test && npx tsc --noEmit && npm run lint && npm run build` verts ; rapport de revue sans point bloquant ; puis passer `status: done`, déplacer le plan dans `.opencode/plans/done/` et commit
