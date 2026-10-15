@@ -1,5 +1,15 @@
-import type { Broadcast, ContentMessage, JobProgress, JobState, Request, Response } from '@/types';
+import type {
+  Broadcast,
+  ContentMessage,
+  JobProgress,
+  JobState,
+  LogMessage,
+  Request,
+  Response,
+} from '@/types';
 import type { BatchState } from '@/types';
+import { sanitizeEntry } from '@/shared/logger';
+import { log, logStore } from './log';
 import {
   runJob,
   runBatch,
@@ -13,6 +23,9 @@ import { installMediaCapture } from './media-capture';
 import { enrichVideos } from './enrich';
 
 installMediaCapture();
+
+// Startup breadcrumb — lands in the central log buffer, persisted by the store.
+log.info('sw started', { version: chrome.runtime.getManifest().version });
 
 /**
  * Hydrate persisted job state on worker wake-up. MV3 kills idle workers at any
@@ -50,10 +63,22 @@ function broadcastBatch(state: BatchState): void {
 }
 
 chrome.runtime.onMessage.addListener(
-  (message: Request | ContentMessage, sender, sendResponse: (response: Response) => void) => {
+  (
+    message: Request | ContentMessage | LogMessage,
+    sender,
+    sendResponse: (response: Response) => void,
+  ) => {
     // Detection results from a content script.
     if (message.type === 'VIDEOS_DETECTED') {
       if (sender.tab?.id != null) videosByTab.set(sender.tab.id, message.videos);
+      return false;
+    }
+
+    // A log line from another context — fire-and-forget, buffered by the worker.
+    if (message.type === 'LOG') {
+      // Untrusted entry from the wire — validated and re-redacted before storage.
+      const entry = sanitizeEntry(message.entry);
+      if (entry) logStore.append(entry);
       return false;
     }
 
@@ -139,6 +164,21 @@ chrome.runtime.onMessage.addListener(
       void (async () => {
         await jobsReady;
         cancelJob(message.videoId);
+        sendResponse({ ok: true });
+      })();
+      return true; // async response
+    }
+
+    if (message.type === 'GET_LOGS') {
+      void (async () => {
+        sendResponse({ ok: true, logs: await logStore.readAll() });
+      })();
+      return true; // async response — the store may still be flushing
+    }
+
+    if (message.type === 'CLEAR_LOGS') {
+      void (async () => {
+        await logStore.clear();
         sendResponse({ ok: true });
       })();
       return true; // async response

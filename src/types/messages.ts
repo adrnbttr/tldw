@@ -1,6 +1,7 @@
 import type { DetectedVideo } from './video';
 import type { Summary } from './summary';
 import type { TldwErrorCode } from './errors';
+import type { LogEntry } from '@/shared/logger';
 
 /**
  * The typed message protocol between contexts.
@@ -47,7 +48,9 @@ export type Request =
   | { type: 'SUMMARIZE'; video: DetectedVideo }
   | { type: 'SUMMARIZE_BATCH'; videos: DetectedVideo[] }
   | { type: 'GET_BATCH_STATE' }
-  | { type: 'CANCEL'; videoId: string };
+  | { type: 'CANCEL'; videoId: string }
+  | { type: 'GET_LOGS' }
+  | { type: 'CLEAR_LOGS' };
 
 /** The running/most-recent job with its video, for popup restore (F2). */
 export interface ActiveJob {
@@ -82,6 +85,7 @@ export type Response =
   | { ok: true; state: JobState }
   | { ok: true; batch: BatchState }
   | { ok: true; active: ActiveJob | null }
+  | { ok: true; logs: LogEntry[] }
   | { ok: true }
   | { ok: false; code: TldwErrorCode; message: string };
 
@@ -90,6 +94,10 @@ export type Broadcast =
   | { type: 'JOB_PROGRESS'; progress: JobProgress }
   | { type: 'JOB_STATE'; state: JobState }
   | { type: 'BATCH_STATE'; state: BatchState };
+
+/** offscreen/content/popup → background: one redacted log line, fire-and-forget —
+ * the worker is the single writer of the central log buffer. */
+export type LogMessage = { type: 'LOG'; entry: LogEntry };
 
 /** content → background (detection results for the active tab). */
 export type ContentMessage = { type: 'VIDEOS_DETECTED'; videos: DetectedVideo[] };
