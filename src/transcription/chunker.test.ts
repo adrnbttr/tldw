@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planChunks, mergeChunkTranscripts } from './chunker';
+import { planChunks, mergeChunkTranscripts, assembleChunkSegments } from './chunker';
 
 describe('planChunks', () => {
   it('returns a single chunk when the audio fits', () => {
@@ -21,6 +21,64 @@ describe('planChunks', () => {
   it('handles degenerate input', () => {
     expect(planChunks({ durationSeconds: 0, bytesPerSecond: 8000 })).toEqual([]);
     expect(planChunks({ durationSeconds: 100, bytesPerSecond: 0 })).toEqual([]);
+  });
+
+  it('caps chunks at ~12 minutes by default (1 h audio)', () => {
+    const plans = planChunks({ durationSeconds: 3600, bytesPerSecond: 8000, overlapSeconds: 0 });
+    expect(plans).toHaveLength(5);
+    for (const p of plans) {
+      expect(p.end - p.start).toBeLessThanOrEqual(720);
+    }
+    // Coverage is exact: 5 × 720 s = 3600 s, no gaps.
+    expect(plans[plans.length - 1].end).toBe(3600);
+    expect(plans.map((p) => p.start)).toEqual([0, 720, 1440, 2160, 2880]);
+  });
+
+  it('honors an explicit maxChunkSeconds', () => {
+    const plans = planChunks({
+      durationSeconds: 3600,
+      bytesPerSecond: 8000,
+      overlapSeconds: 0,
+      maxChunkSeconds: 600,
+    });
+    for (const p of plans) {
+      expect(p.end - p.start).toBeLessThanOrEqual(600);
+    }
+    expect(plans[plans.length - 1].end).toBe(3600);
+  });
+
+  it('still respects the byte cap when it is tighter', () => {
+    // 1.6 MB / 8000 B/s = 200 s < the 720 s time cap.
+    const plans = planChunks({
+      durationSeconds: 1000,
+      bytesPerSecond: 8000,
+      overlapSeconds: 0,
+      maxBytes: 1_600_000,
+    });
+    expect(plans).toHaveLength(5);
+    for (const p of plans) {
+      expect(p.end - p.start).toBeLessThanOrEqual(200);
+    }
+  });
+});
+
+describe('assembleChunkSegments', () => {
+  it('keeps chunk order regardless of completion order', () => {
+    const chunks = planChunks({ durationSeconds: 3600, bytesPerSecond: 8000, overlapSeconds: 0 });
+    // Chunks complete in reverse order (worst-case concurrency), one fails.
+    const texts: Array<string | undefined> = [];
+    for (const c of [...chunks].reverse()) texts[c.index] = `t${c.index}`;
+    texts[2] = undefined;
+
+    const segments = assembleChunkSegments(chunks, texts);
+    expect(segments.map((s) => s.text)).toEqual(['t0', 't1', 't3', 't4']);
+    expect(segments[1]).toMatchObject({ start: chunks[1].start, end: chunks[1].end });
+  });
+
+  it('trims and drops empty texts', () => {
+    const chunks = planChunks({ durationSeconds: 600, bytesPerSecond: 8000 });
+    const segments = assembleChunkSegments(chunks, ['  hello  ', '']);
+    expect(segments).toEqual([{ start: 0, end: 600, text: 'hello' }]);
   });
 });
 

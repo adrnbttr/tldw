@@ -110,11 +110,14 @@ export const fr: Messages = {
       'Lancez la lecture de la vidéo quelques secondes, puis réessayez — le flux doit charger.',
     MEDIA_PROTECTED:
       'Le contenu est protégé (chiffré). La transcription audio ne peut pas être effectuée.',
+    MEDIA_TOO_LARGE:
+      'Cette vidéo est trop volumineuse pour être traitée en mémoire. Essayez une vidéo plus courte.',
     AUDIO_EXTRACTION_FAILED: "L'isolation de la piste audio a échoué.",
     TRANSCRIPTION_API_ERROR: 'Le service de transcription a renvoyé une erreur.',
     TIMEOUT: 'Le traitement a dépassé le délai imparti. Essayez avec une vidéo plus courte.',
     UNSUPPORTED_PROVIDER: "Cet hébergeur n'est pas encore supporté.",
     SUMMARY_API_ERROR: 'La génération du résumé a échoué.',
+    INTERRUPTED: 'Interrompu — le worker de l’extension a redémarré. Vous pouvez le relancer.',
     UNKNOWN: "Une erreur inattendue s'est produite.",
   },
   onboarding: {

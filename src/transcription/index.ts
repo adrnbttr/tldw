@@ -4,7 +4,12 @@ import { getCapturedMedia } from '@/background/media-capture';
 import type { MediaCandidate } from './media';
 import { classifyMedia } from './media';
 import { getCatalog, isLocale } from '@/i18n';
-import type { OffscreenRequest, OffscreenResponse, TranscribeJob } from './offscreen-protocol';
+import type {
+  OffscreenProgressPhase,
+  OffscreenRequest,
+  OffscreenResponse,
+  TranscribeJob,
+} from './offscreen-protocol';
 import { OFFSCREEN_PATH } from './offscreen-protocol';
 
 /**
@@ -22,12 +27,42 @@ export interface Transcriber {
   transcribe(
     video: DetectedVideo,
     settings: Settings,
-    onProgress: (detail: string) => void,
+    onProgress: (detail: string, phase?: OffscreenProgressPhase) => void,
     signal?: AbortSignal,
   ): Promise<Transcript>;
 }
 
 const WHISPER_MODEL = 'whisper-1';
+
+/**
+ * Fixed budget for the download + extraction phase, independent of media
+ * length: fetching bytes and probing the container should not grow with the
+ * video, and a stalled host must fail within it.
+ */
+export const MEDIA_TIMEOUT_SECONDS = 10 * 60;
+
+/** Hard ceiling for the transcription phase: no budget grows past 4 h. */
+const MAX_TRANSCRIPTION_TIMEOUT_SECONDS = 4 * 3600;
+
+/**
+ * Timeout for the transcription phase: the user's base timeout plus one second
+ * of budget per second of media (real-time pace), capped at 4 h. `baseSeconds`
+ * (the `timeoutSeconds` setting, 15 min by default) stays the floor — null,
+ * negative or NaN durations add nothing; negative/NaN bases count as 0.
+ */
+export function transcriptionTimeoutSeconds(
+  durationSeconds: number | null,
+  baseSeconds: number,
+): number {
+  const duration = positiveSecondsOrZero(durationSeconds);
+  const base = positiveSecondsOrZero(baseSeconds);
+  return Math.min(base + duration, MAX_TRANSCRIPTION_TIMEOUT_SECONDS);
+}
+
+/** Treats null/negative/NaN as "no value" instead of poisoning the arithmetic. */
+function positiveSecondsOrZero(seconds: number | null): number {
+  return seconds != null && Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+}
 
 export const audioTranscriber: Transcriber = {
   async transcribe(video, settings, onProgress, signal) {
@@ -44,7 +79,7 @@ export const audioTranscriber: Transcriber = {
     if (sources.length === 0) {
       // Nothing captured yet — nudge the page to start the video, then re-check.
       const loc = isLocale(settings.uiLanguage) ? settings.uiLanguage : 'en';
-      onProgress(getCatalog(loc).transcription.fetchingMedia);
+      onProgress(getCatalog(loc).transcription.fetchingMedia, 'download');
       await primeAndWait(video);
       sources = await resolveSources(video);
     }
@@ -160,13 +195,23 @@ async function ensureOffscreen(): Promise<void> {
   });
 }
 
+/**
+ * Drives one offscreen job. Download + extraction run under the fixed
+ * `MEDIA_TIMEOUT_SECONDS` budget; entering the transcription phase re-arms the
+ * timer with a duration-proportional budget (`transcriptionTimeoutSeconds`).
+ */
 function runInOffscreen(
   job: TranscribeJob,
-  onProgress: (detail: string) => void,
+  onProgress: (detail: string, phase?: OffscreenProgressPhase) => void,
   timeoutSeconds: number,
   signal?: AbortSignal,
 ): Promise<{ language: string; segments: TranscriptSegment[] }> {
   return new Promise((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout>;
+    // Last phase reported, so the transcription budget is armed exactly once,
+    // at the download/extract → transcribe transition.
+    let lastPhase: OffscreenProgressPhase | undefined;
+
     const cleanup = () => {
       chrome.runtime.onMessage.removeListener(listener);
       clearTimeout(timer);
@@ -174,10 +219,32 @@ function runInOffscreen(
       void chrome.offscreen.closeDocument().catch(() => {});
     };
 
+    const onTimeout = () => {
+      cleanup();
+      reject(
+        new TldwError(
+          'TIMEOUT',
+          lastPhase === 'transcribe'
+            ? 'Transcription exceeded the time limit.'
+            : 'Media download or extraction exceeded the time limit.',
+        ),
+      );
+    };
+
     const listener = (msg: OffscreenResponse) => {
       if (!('videoId' in msg) || msg.videoId !== job.videoId) return;
       if (msg.type === 'OFFSCREEN_PROGRESS') {
-        onProgress(msg.detail);
+        onProgress(msg.detail, msg.phase);
+        // Switching to transcription swaps the fixed media budget for one
+        // proportional to the now-resolved media duration.
+        if (msg.phase === 'transcribe' && lastPhase !== 'transcribe') {
+          clearTimeout(timer);
+          timer = setTimeout(
+            onTimeout,
+            transcriptionTimeoutSeconds(msg.duration ?? null, timeoutSeconds) * 1000,
+          );
+        }
+        lastPhase = msg.phase;
         return;
       }
       if (msg.type === 'OFFSCREEN_RESULT') {
@@ -193,10 +260,8 @@ function runInOffscreen(
       reject(new TldwError('TIMEOUT', 'Transcription cancelled.'));
     };
 
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new TldwError('TIMEOUT', 'Transcription exceeded the time limit.'));
-    }, timeoutSeconds * 1000);
+    // Download + extraction first, under the fixed media budget.
+    timer = setTimeout(onTimeout, MEDIA_TIMEOUT_SECONDS * 1000);
 
     chrome.runtime.onMessage.addListener(listener);
     signal?.addEventListener('abort', onAbort);

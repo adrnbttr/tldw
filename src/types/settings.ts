@@ -39,7 +39,10 @@ export interface Settings {
   onboarded: boolean;
   /** Default rendered length of a summary (also the export depth). */
   detailLevel: DetailLevel;
-  /** Global processing timeout for the audio fallback, in seconds. */
+  /**
+   * Base timeout of the transcription phase, in seconds; extended
+   * proportionally to the media duration.
+   */
   timeoutSeconds: number;
   /** Max number of summaries kept in history. */
   historyLimit: number;

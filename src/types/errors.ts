@@ -12,12 +12,15 @@ export type TldwErrorCode =
   | 'MEDIA_NOT_CAPTURABLE'
   | 'MEDIA_NEEDS_PLAYBACK'
   | 'MEDIA_PROTECTED'
+  | 'MEDIA_TOO_LARGE'
   | 'AUDIO_EXTRACTION_FAILED'
   | 'TRANSCRIPTION_API_ERROR'
   | 'TIMEOUT'
   // Detection
   | 'NO_VIDEO_DETECTED'
   | 'UNSUPPORTED_PROVIDER'
+  // Job lifecycle
+  | 'INTERRUPTED'
   // Summarizer / config
   | 'MISSING_OPENROUTER_KEY'
   | 'MISSING_TRANSCRIPTION_KEY'
@@ -58,11 +61,13 @@ export const ERROR_MESSAGES: Record<TldwErrorCode, string> = {
   MEDIA_NEEDS_PLAYBACK:
     'Play the video for a few seconds, then try again — the media stream needs to load first.',
   MEDIA_PROTECTED: 'The content is protected (encrypted). Audio transcription cannot be performed.',
+  MEDIA_TOO_LARGE: 'The video is too large to process in memory. Try a shorter video.',
   AUDIO_EXTRACTION_FAILED: 'Isolating the audio track failed.',
   TRANSCRIPTION_API_ERROR: 'The transcription service returned an error.',
   TIMEOUT: 'Processing exceeded the time limit. Try a shorter video.',
   UNSUPPORTED_PROVIDER: 'This host is not supported yet.',
   SUMMARY_API_ERROR: 'Generating the summary failed.',
+  INTERRUPTED: 'Interrupted — the extension worker was restarted. You can relaunch it.',
   UNKNOWN: 'An unexpected error occurred.',
 };
 

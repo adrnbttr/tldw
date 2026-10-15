@@ -110,11 +110,13 @@ export const en: Messages = {
       'Play the video for a few seconds, then try again — the stream needs to load first.',
     MEDIA_PROTECTED:
       'The content is protected (encrypted). Audio transcription cannot be performed.',
+    MEDIA_TOO_LARGE: 'This video is too large to process in memory. Try a shorter one.',
     AUDIO_EXTRACTION_FAILED: 'Isolating the audio track failed.',
     TRANSCRIPTION_API_ERROR: 'The transcription service returned an error.',
     TIMEOUT: 'Processing exceeded the time limit. Try a shorter video.',
     UNSUPPORTED_PROVIDER: 'This host is not supported yet.',
     SUMMARY_API_ERROR: 'Generating the summary failed.',
+    INTERRUPTED: 'Interrupted — the extension worker was restarted. You can relaunch it.',
     UNKNOWN: 'An unexpected error occurred.',
   },
   onboarding: {

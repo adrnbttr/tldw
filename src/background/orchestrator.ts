@@ -15,6 +15,8 @@ import { audioTranscriber } from '@/transcription';
 import { summarize, summarizeYouTubeVideo } from '@/summarizer';
 import { getCatalog, isLocale } from '@/i18n';
 import { getSettings, saveSummary, findCachedSummary } from '@/storage';
+import { markInterrupted, sessionJobStore, snapshotOf } from './job-store';
+import type { JobStore } from './job-store';
 
 /**
  * Job orchestration — the best-effort cascade (spec §2.1).
@@ -29,6 +31,34 @@ const jobs = new Map<string, JobState>();
 const jobVideos = new Map<string, DetectedVideo>();
 const controllers = new Map<string, AbortController>();
 let lastJobId: string | null = null;
+
+/**
+ * Best-effort persistence: mirror the live state to session storage so a
+ * restarted worker can report what happened. Fire-and-forget — a failed or
+ * slow write must never break a job in flight.
+ */
+function commit(): void {
+  sessionJobStore.save(snapshotOf(jobs, lastJobId)).catch(() => {
+    // Storage unavailable (quota, transient failure) — in-memory state is
+    // still authoritative for this worker's lifetime.
+  });
+}
+
+/**
+ * Hydrate the in-memory state from the store on worker wake-up. Any job that
+ * was still `running` when the previous worker died is converted to a typed
+ * INTERRUPTED error, retryable from the popup's existing error rendering.
+ * A failed read leaves the worker running clean rather than crashing it.
+ */
+export async function restoreJobs(store: JobStore = sessionJobStore): Promise<void> {
+  try {
+    const snapshot = markInterrupted(await store.load());
+    for (const [videoId, state] of Object.entries(snapshot.jobs)) jobs.set(videoId, state);
+    lastJobId = snapshot.lastJobId;
+  } catch {
+    // Unreadable store — start from idle.
+  }
+}
 
 type Broadcaster = (state: JobState, progress?: JobProgress) => void;
 
@@ -131,10 +161,12 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
     entry.detail = detail;
     const state: JobState = { phase: 'running', videoId: video.id, steps: [...steps] };
     jobs.set(video.id, state);
+    commit();
     broadcast(state, entry);
   };
 
   jobs.set(video.id, { phase: 'running', videoId: video.id, steps });
+  commit();
   broadcast({ phase: 'running', videoId: video.id, steps });
 
   try {
@@ -145,6 +177,7 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
     if (cached) {
       const done: JobState = { phase: 'done', videoId: video.id, summary: cached };
       jobs.set(video.id, done);
+      commit();
       broadcast(done);
       return;
     }
@@ -167,6 +200,7 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
 
     const done: JobState = { phase: 'done', videoId: video.id, summary };
     jobs.set(video.id, done);
+    commit();
     broadcast(done);
   } catch (err) {
     const code = err instanceof TldwError ? err.code : 'UNKNOWN';
@@ -179,6 +213,7 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
       detail: detail?.slice(0, 600),
     };
     jobs.set(video.id, state);
+    commit();
     broadcast(state);
   } finally {
     controllers.delete(video.id);
@@ -225,11 +260,17 @@ async function extract(
 
   // Level 2 — audio fallback.
   setStep('audio_capture', 'active');
-  setStep('transcription', 'active');
   const transcript = await audioTranscriber.transcribe(
     video,
     settings,
-    (detail) => setStep('transcription', 'active', detail),
+    (detail, phase) => {
+      if (phase === 'transcribe') {
+        setStep('audio_capture', 'done');
+        setStep('transcription', 'active', detail);
+      } else {
+        setStep('audio_capture', 'active', detail);
+      }
+    },
     signal,
   );
   setStep('audio_capture', 'done');

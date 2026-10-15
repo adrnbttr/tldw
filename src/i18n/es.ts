@@ -111,11 +111,14 @@ export const es: Messages = {
       'Reproduce el vídeo unos segundos y vuelve a intentarlo — el flujo debe cargarse primero.',
     MEDIA_PROTECTED:
       'El contenido está protegido (cifrado). No se puede realizar la transcripción de audio.',
+    MEDIA_TOO_LARGE:
+      'Este vídeo es demasiado grande para procesarlo en memoria. Prueba con uno más corto.',
     AUDIO_EXTRACTION_FAILED: 'No se pudo aislar la pista de audio.',
     TRANSCRIPTION_API_ERROR: 'El servicio de transcripción devolvió un error.',
     TIMEOUT: 'El procesamiento superó el tiempo límite. Prueba con un vídeo más corto.',
     UNSUPPORTED_PROVIDER: 'Este proveedor aún no es compatible.',
     SUMMARY_API_ERROR: 'No se pudo generar el resumen.',
+    INTERRUPTED: 'Interrumpido — el worker de la extensión se reinició. Puedes relanzarlo.',
     UNKNOWN: 'Se produjo un error inesperado.',
   },
   onboarding: {

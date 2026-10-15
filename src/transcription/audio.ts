@@ -1,5 +1,4 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile } from '@ffmpeg/util';
 import { TldwError } from '@/types';
 
 /**
@@ -13,13 +12,97 @@ import { TldwError } from '@/types';
  * `public/ffmpeg` and loaded from its same-origin chrome-extension:// URL via the
  * worker's dynamic import(); no SharedArrayBuffer, so no COOP/COEP needed.
  *
- * Strategy: decode the source once into a compact mono 16 kHz MP3, then slice that
- * MP3 per chunk (cheap, no re-decode).
+ * Strategy: the source is written once into the ffmpeg FS, then extracted one
+ * time window at a time as a compact mono 16 kHz MP3 — the video bytes and a
+ * full-length MP3 never coexist in memory.
  */
 
 const AUDIO_BITRATE_KBPS = 64;
-/** Bytes per second of the extracted mono MP3, for chunk planning. */
+/** Bytes per second of the extracted mono MP3, for window planning. */
 export const AUDIO_BYTES_PER_SECOND = (AUDIO_BITRATE_KBPS * 1000) / 8;
+
+/** Upper bound on the source media we accept to load (the wasm heap tops at ~2 GB). */
+export const MAX_MEDIA_BYTES = 1536 * 1024 * 1024;
+
+/** Fails clean when the media would exceed the memory budget (F5 rule). */
+export function assertMediaSize(bytes: number): void {
+  if (bytes > MAX_MEDIA_BYTES) {
+    throw new TldwError(
+      'MEDIA_TOO_LARGE',
+      'The video is too large to process in memory.',
+      `${Math.round(bytes / (1024 * 1024))} MB exceeds the ${Math.round(
+        MAX_MEDIA_BYTES / (1024 * 1024),
+      )} MB limit`,
+    );
+  }
+}
+
+/** One planned extraction window of the source media. */
+export interface AudioWindow {
+  index: number;
+  /** Start offset in seconds. */
+  start: number;
+  /** End offset in seconds. */
+  end: number;
+}
+
+export interface AudioWindowOptions {
+  /** Total media duration in seconds. */
+  durationSeconds: number;
+  /** Estimated bytes per second of the extracted audio. */
+  bytesPerSecond: number;
+  /** Max bytes per extracted window (default 24 MB, under the 25 MB Whisper limit). */
+  maxBytes?: number;
+  /** Overlap between consecutive windows, in seconds (default 5). */
+  overlapSeconds?: number;
+}
+
+/**
+ * Plans source-media time windows whose extracted mono MP3 stays under the
+ * transcription size limit, with a few seconds of overlap so no sentence is cut
+ * at a boundary.
+ */
+export function planAudioWindows(options: AudioWindowOptions): AudioWindow[] {
+  const {
+    durationSeconds,
+    bytesPerSecond,
+    maxBytes = 24 * 1024 * 1024,
+    overlapSeconds = 5,
+  } = options;
+
+  if (durationSeconds <= 0 || bytesPerSecond <= 0) return [];
+
+  const maxWindowSeconds = Math.max(overlapSeconds + 1, Math.floor(maxBytes / bytesPerSecond));
+
+  // Single window covers the whole media.
+  if (durationSeconds <= maxWindowSeconds) {
+    return [{ index: 0, start: 0, end: durationSeconds }];
+  }
+
+  const windows: AudioWindow[] = [];
+  let start = 0;
+  let index = 0;
+  while (start < durationSeconds) {
+    const end = Math.min(start + maxWindowSeconds, durationSeconds);
+    windows.push({ index, start, end });
+    if (end >= durationSeconds) break;
+    start = end - overlapSeconds;
+    index++;
+  }
+  return windows;
+}
+
+const DURATION_RE = /Duration:\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/;
+
+/** Parses `Duration: HH:MM:SS.xx` out of an ffmpeg log; `N/A` or absent → null. */
+export function parseFfmpegDuration(log: string): number | null {
+  const m = DURATION_RE.exec(log);
+  if (!m) return null;
+  return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+}
+
+/** The single source file kept inside the ffmpeg FS. */
+const SOURCE_NAME = 'source.media';
 
 export class FfmpegAudio {
   private ffmpeg = new FFmpeg();
@@ -53,16 +136,62 @@ export class FfmpegAudio {
     return this.log.slice(-4).join(' | ');
   }
 
-  /** Decodes an arbitrary media input into a full mono 16 kHz MP3. */
-  async toMonoMp3(input: Uint8Array | string, inputName: string): Promise<Uint8Array> {
+  /** Writes the whole media into the ffmpeg FS as a single file; returns its name. */
+  async writeSource(data: Uint8Array): Promise<string> {
     await this.load();
     try {
-      // fetchFile is for URLs/Blobs; raw bytes go straight to writeFile.
-      const data = typeof input === 'string' ? await fetchFile(input) : input;
-      await this.ffmpeg.writeFile(inputName, data);
-      await this.ffmpeg.exec([
+      await this.ffmpeg.writeFile(SOURCE_NAME, data);
+      return SOURCE_NAME;
+    } catch (err) {
+      throw new TldwError(
+        'AUDIO_EXTRACTION_FAILED',
+        'Loading the media into ffmpeg failed.',
+        `${err} ${this.tail()}`.trim(),
+      );
+    }
+  }
+
+  /** Removes the source file from the ffmpeg FS; never throws (F5 cleanup rule). */
+  async removeSource(): Promise<void> {
+    await this.cleanup([SOURCE_NAME]);
+  }
+
+  /**
+   * Probes the container duration via `ffmpeg -i` — no output file, so ffmpeg
+   * exits non-zero right after logging the input header. null when unknown.
+   */
+  async probeDuration(name: string): Promise<number | null> {
+    await this.load();
+    const lines: string[] = [];
+    const onLog = ({ message }: { message: string }): void => {
+      lines.push(message);
+    };
+    this.ffmpeg.on('log', onLog);
+    try {
+      await this.ffmpeg.exec(['-i', name]);
+    } finally {
+      this.ffmpeg.off('log', onLog);
+    }
+    return parseFfmpegDuration(lines.join('\n'));
+  }
+
+  /**
+   * Extracts `[start, end)` of the source as a mono 16 kHz MP3 window. Returns
+   * null when the output is under half a second's worth of bytes — the stream
+   * ended before this window, so the caller can stop the loop.
+   */
+  async extractWindow(name: string, start: number, end: number): Promise<Uint8Array | null> {
+    await this.load();
+    const outName = 'window.mp3';
+    try {
+      // -ss before -i: ffmpeg seeks straight into the source (no full decode).
+      const code = await this.ffmpeg.exec([
+        '-ss',
+        String(start),
+        '-t',
+        String(end - start),
         '-i',
-        inputName,
+        name,
         '-vn',
         '-ac',
         '1',
@@ -70,50 +199,22 @@ export class FfmpegAudio {
         '16000',
         '-b:a',
         `${AUDIO_BITRATE_KBPS}k`,
-        'output.mp3',
+        outName,
       ]);
-      const out = await this.ffmpeg.readFile('output.mp3');
-      if (!out || (out as Uint8Array).byteLength === 0) {
-        throw new Error('empty output — the input had no decodable audio track');
+      if (code !== 0) {
+        throw new Error(`ffmpeg exited with code ${code}`);
       }
-      await this.cleanup([inputName, 'output.mp3']);
-      return out as Uint8Array;
+      const out = (await this.ffmpeg.readFile(outName)) as Uint8Array;
+      if (!out || out.byteLength < AUDIO_BYTES_PER_SECOND / 2) return null;
+      return out;
     } catch (err) {
       throw new TldwError(
         'AUDIO_EXTRACTION_FAILED',
         'Audio extraction failed.',
         `${err} ${this.tail()}`.trim(),
       );
-    }
-  }
-
-  /** Slices a time range out of an MP3 without re-encoding. */
-  async slice(mp3: Uint8Array, start: number, end: number): Promise<Uint8Array> {
-    await this.load();
-    const inName = 'full.mp3';
-    const outName = `chunk-${start}-${end}.mp3`;
-    try {
-      await this.ffmpeg.writeFile(inName, mp3);
-      await this.ffmpeg.exec([
-        '-ss',
-        String(start),
-        '-to',
-        String(end),
-        '-i',
-        inName,
-        '-c',
-        'copy',
-        outName,
-      ]);
-      const data = (await this.ffmpeg.readFile(outName)) as Uint8Array;
-      await this.cleanup([inName, outName]);
-      return data;
-    } catch (err) {
-      throw new TldwError(
-        'AUDIO_EXTRACTION_FAILED',
-        'Audio slicing failed.',
-        `${err} ${this.tail()}`.trim(),
-      );
+    } finally {
+      await this.cleanup([outName]);
     }
   }
 

@@ -1,6 +1,7 @@
 import type { TranscriptSegment } from '@/types';
 import { TldwError } from '@/types';
 import type {
+  OffscreenProgressPhase,
   OffscreenRequest,
   OffscreenResponse,
   TranscribeJob,
@@ -14,8 +15,14 @@ import {
   parseVimeoMaster,
 } from '@/transcription/media';
 import type { VimeoMaster } from '@/transcription/media';
-import { FfmpegAudio, AUDIO_BYTES_PER_SECOND } from '@/transcription/audio';
-import { planChunks, mergeChunkTranscripts } from '@/transcription/chunker';
+import {
+  FfmpegAudio,
+  AUDIO_BYTES_PER_SECOND,
+  assertMediaSize,
+  planAudioWindows,
+} from '@/transcription/audio';
+import type { AudioWindow } from '@/transcription/audio';
+import { assembleChunkSegments, mergeChunkTranscripts, planChunks } from '@/transcription/chunker';
 import { planByteRanges } from '@/transcription/ranges';
 import { transcribeAudio } from '@/transcription/whisper';
 import { transcribeViaOpenRouter } from '@/transcription/openrouter-audio';
@@ -26,12 +33,19 @@ import type { Messages } from '@/i18n';
  * Offscreen document (F5).
  *
  * Runs the full audio-fallback pipeline off the service worker:
- *   resolve media source → download → extract mono MP3 → chunk → transcribe → merge.
+ *   resolve media source → download → load into ffmpeg → extract per-window
+ *   mono MP3 → transcribe → merge.
  * Transcription uses OpenRouter (Gemini) by default, or OpenAI Whisper. Progress
  * and the terminal result are posted back to the worker.
  */
 
 const audio = new FfmpegAudio();
+
+/**
+ * Duration assumed when neither the page nor the container reports one; the
+ * window loop then stops at the first empty window past the real end.
+ */
+const UNKNOWN_DURATION_SECONDS = 6 * 3600;
 
 chrome.runtime.onMessage.addListener((message: OffscreenRequest) => {
   if (message.type === 'OFFSCREEN_TRANSCRIBE') {
@@ -48,22 +62,26 @@ function report(msg: OffscreenResponse): void {
 
 async function runJob(job: TranscribeJob): Promise<void> {
   const t = getCatalog(isLocale(job.uiLanguage) ? job.uiLanguage : 'en').transcription;
-  const progress = (detail: string) =>
-    report({ type: 'OFFSCREEN_PROGRESS', videoId: job.videoId, detail });
+  const progress: ProgressFn = (phase, detail, duration) =>
+    report({ type: 'OFFSCREEN_PROGRESS', videoId: job.videoId, phase, detail, duration });
   const diag: string[] = [];
 
   try {
-    const mediaBytes = await downloadSource(job, t, progress, diag);
+    let mediaBytes: Uint8Array | null = await downloadSource(job, t, progress, diag);
+    assertMediaSize(mediaBytes.byteLength);
 
-    progress(t.extractingAudio);
-    const mp3 = await audio.toMonoMp3(mediaBytes, 'input.media');
-    const duration = job.duration ?? estimateDuration(mp3.byteLength);
+    progress('extract', t.extractingAudio);
+    const source = await audio.writeSource(mediaBytes);
+    mediaBytes = null; // the ffmpeg FS holds its own copy — release this one.
+    const duration =
+      job.duration ?? (await audio.probeDuration(source)) ?? UNKNOWN_DURATION_SECONDS;
 
     const { language, segments } =
       job.transcriptionProvider === 'openrouter'
-        ? await transcribeWithOpenRouter(job, mp3, duration, t, progress)
-        : await transcribeWithWhisper(job, mp3, duration, t, progress);
+        ? await transcribeWithOpenRouter(job, source, duration, t, progress)
+        : await transcribeWithWhisper(job, source, duration, t, progress);
 
+    await audio.removeSource();
     audio.terminate();
     report({ type: 'OFFSCREEN_RESULT', videoId: job.videoId, ok: true, language, segments });
   } catch (err) {
@@ -93,13 +111,20 @@ interface TranscriptResult {
   segments: TranscriptSegment[];
 }
 
+/**
+ * Progress callback threaded through the pipeline: coarse phase (so the worker
+ * can time each phase), localized detail, plus the resolved media duration once
+ * extraction has probed it.
+ */
+type ProgressFn = (phase: OffscreenProgressPhase, detail: string, duration?: number) => void;
+
 /** OpenRouter (Gemini) path: plain-text transcript, no overlap, one segment/chunk. */
 async function transcribeWithOpenRouter(
   job: TranscribeJob,
-  mp3: Uint8Array,
+  source: string,
   duration: number,
   t: Messages['transcription'],
-  progress: (detail: string) => void,
+  progress: ProgressFn,
 ): Promise<TranscriptResult> {
   const chunks = planChunks({
     durationSeconds: duration,
@@ -107,49 +132,59 @@ async function transcribeWithOpenRouter(
     overlapSeconds: 0,
   });
 
-  const segments: TranscriptSegment[] = [];
+  // Index-addressed texts: chunk completion order (even concurrent) cannot
+  // reorder the transcript.
+  const texts: Array<string | undefined> = [];
   for (const chunk of chunks) {
     progress(
+      'transcribe',
       chunks.length === 1
         ? t.transcribingOne
         : t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)),
+      duration,
     );
-    const slice = chunks.length === 1 ? mp3 : await audio.slice(mp3, chunk.start, chunk.end);
-    const text = await transcribeViaOpenRouter(slice, {
+    const mp3 = await extractAudioWindow(source, chunk);
+    if (!mp3) break;
+    texts[chunk.index] = await transcribeViaOpenRouter(mp3, {
       apiKey: job.openRouterKey,
       model: job.audioModel,
       language: job.language,
     });
-    if (text) segments.push({ start: chunk.start, end: chunk.end, text });
   }
 
-  return { language: job.language, segments };
+  return { language: job.language, segments: assembleChunkSegments(chunks, texts) };
 }
 
 /** OpenAI Whisper path: per-segment timings, overlap, reassembled + de-duplicated. */
 async function transcribeWithWhisper(
   job: TranscribeJob,
-  mp3: Uint8Array,
+  source: string,
   duration: number,
   t: Messages['transcription'],
-  progress: (detail: string) => void,
+  progress: ProgressFn,
 ): Promise<TranscriptResult> {
-  const chunks = planChunks({ durationSeconds: duration, bytesPerSecond: AUDIO_BYTES_PER_SECOND });
+  const windows = planAudioWindows({
+    durationSeconds: duration,
+    bytesPerSecond: AUDIO_BYTES_PER_SECOND,
+  });
 
-  const perChunkSegments: TranscriptSegment[][] = [];
+  const perWindowSegments: TranscriptSegment[][] = [];
   const offsets: number[] = [];
   let language = job.language;
 
-  for (const chunk of chunks) {
+  for (const window of windows) {
     progress(
-      chunks.length === 1
+      'transcribe',
+      windows.length === 1
         ? t.transcribingOne
-        : t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)),
+        : t.transcribing(window.index + 1, windows.length, formatClock(window.start)),
+      duration,
     );
-    const slice = chunks.length === 1 ? mp3 : await audio.slice(mp3, chunk.start, chunk.end);
+    const mp3 = await extractAudioWindow(source, window);
+    if (!mp3) break;
     const result = await transcribeAudio(
-      new Blob([slice as BlobPart]),
-      `chunk-${chunk.index}.mp3`,
+      new Blob([mp3 as BlobPart]),
+      `window-${window.index}.mp3`,
       {
         apiKey: job.transcriptionKey,
         model: job.whisperModel,
@@ -157,18 +192,31 @@ async function transcribeWithWhisper(
       },
     );
     language = result.language || language;
-    perChunkSegments.push(result.segments);
-    offsets.push(chunk.start);
+    perWindowSegments.push(result.segments);
+    offsets.push(window.start);
   }
 
-  return { language, segments: mergeChunkTranscripts(perChunkSegments, offsets) };
+  return { language, segments: mergeChunkTranscripts(perWindowSegments, offsets) };
+}
+
+/**
+ * Extracts one window of the source audio. An empty first window means the
+ * media has no decodable audio track (typed error); a later empty window means
+ * the stream ended (null → the caller stops the loop).
+ */
+async function extractAudioWindow(source: string, window: AudioWindow): Promise<Uint8Array | null> {
+  const mp3 = await audio.extractWindow(source, window.start, window.end);
+  if (!mp3 && window.index === 0) {
+    throw new TldwError('AUDIO_EXTRACTION_FAILED', 'The input has no decodable audio track.');
+  }
+  return mp3;
 }
 
 /** Resolves and downloads the best media source into a single byte buffer. */
 async function downloadSource(
   job: TranscribeJob,
   t: Messages['transcription'],
-  progress: (detail: string) => void,
+  progress: ProgressFn,
   diag: string[],
 ): Promise<Uint8Array> {
   const best = pickBestCandidate(job.sources);
@@ -194,7 +242,7 @@ async function downloadSource(
     throw new TldwError('MEDIA_NOT_CAPTURABLE', 'No media source was captured.');
   }
 
-  progress(t.fetchingMedia);
+  progress('download', t.fetchingMedia);
 
   if (best.kind === 'vimeo_master') {
     return downloadVimeoMaster(best.url, t, progress, diag);
@@ -236,7 +284,7 @@ async function downloadSource(
     // The fMP4 init segment MUST come first, or the fragments are undecodable.
     if (initUrl) parts.push(await fetchBytes(initUrl));
     for (let i = 0; i < segmentUrls.length; i++) {
-      progress(t.assembling(i + 1, segmentUrls.length));
+      progress('download', t.assembling(i + 1, segmentUrls.length));
       parts.push(await fetchBytes(segmentUrls[i]));
     }
     return concat(parts);
@@ -261,7 +309,7 @@ const RANGE_BLOCK_BYTES = 8 * 1024 * 1024;
 async function downloadByRanges(
   url: string,
   t: Messages['transcription'],
-  progress: (detail: string) => void,
+  progress: ProgressFn,
   diag: string[],
 ): Promise<Uint8Array | null> {
   // Probe with a 1-byte range: 206 + `Content-Range: bytes 0-0/TOTAL` proves
@@ -270,6 +318,7 @@ async function downloadByRanges(
   if (probe.status !== 206) {
     // Server ignored Range: this very response (200) is the full file — keep it
     // rather than re-downloading everything with a second full-GET fallback.
+    assertContentLength(probe);
     diag.push('ranges unsupported → single fetch');
     return new Uint8Array(await probe.arrayBuffer());
   }
@@ -281,11 +330,13 @@ async function downloadByRanges(
     diag.push('ranges no total → full fetch');
     return null;
   }
+  assertMediaSize(totalBytes);
 
   const ranges = planByteRanges(totalBytes, RANGE_BLOCK_BYTES);
   diag.push(`ranges total=${mb(totalBytes)}MB blocks=${ranges.length}`);
 
-  const parts: Uint8Array[] = [];
+  // Preallocated destination: each block lands at its own offset, no giant concat.
+  const out = new Uint8Array(totalBytes);
   for (const [start, end] of ranges) {
     const res = await fetchAuth(url, { Range: `bytes=${start}-${end}` });
     if (res.status !== 206) {
@@ -299,10 +350,10 @@ async function downloadByRanges(
         `Range ${start}-${end} returned ${block.byteLength} bytes.`,
       );
     }
-    parts.push(block);
-    progress(t.downloading(mb(end + 1), mb(totalBytes)));
+    out.set(block, start);
+    progress('download', t.downloading(mb(end + 1), mb(totalBytes)));
   }
-  return concat(parts);
+  return out;
 }
 
 /** Rounds a byte count to MiB with one decimal (progress labels, diagnostics). */
@@ -314,7 +365,7 @@ function mb(bytes: number): number {
 async function downloadVimeoMaster(
   masterUrl: string,
   t: Messages['transcription'],
-  progress: (detail: string) => void,
+  progress: ProgressFn,
   diag: string[],
 ): Promise<Uint8Array> {
   // Force base64_init so the init segment is inlined in the manifest.
@@ -332,7 +383,7 @@ async function downloadVimeoMaster(
 
   const parts: Uint8Array[] = [base64ToBytes(initBase64)];
   for (let i = 0; i < segmentUrls.length; i++) {
-    progress(t.assembling(i + 1, segmentUrls.length));
+    progress('download', t.assembling(i + 1, segmentUrls.length));
     parts.push(await fetchBytes(segmentUrls[i]));
   }
   return concat(parts);
@@ -356,8 +407,16 @@ async function fetchAuth(url: string, headers?: Record<string, string>): Promise
   return res;
 }
 
+/** Fails clean when the response announces a body over the memory limit. */
+function assertContentLength(res: Response): void {
+  const len = Number(res.headers.get('content-length'));
+  if (Number.isFinite(len) && len > 0) assertMediaSize(len);
+}
+
 async function fetchBytes(url: string): Promise<Uint8Array> {
-  return new Uint8Array(await (await fetchAuth(url)).arrayBuffer());
+  const res = await fetchAuth(url);
+  assertContentLength(res);
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 function concat(parts: Uint8Array[]): Uint8Array {
@@ -369,10 +428,6 @@ function concat(parts: Uint8Array[]): Uint8Array {
     offset += p.byteLength;
   }
   return out;
-}
-
-function estimateDuration(byteLength: number): number {
-  return Math.max(1, Math.round(byteLength / AUDIO_BYTES_PER_SECOND));
 }
 
 function formatClock(seconds: number): string {

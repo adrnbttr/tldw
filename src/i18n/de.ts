@@ -111,11 +111,15 @@ export const de: Messages = {
       'Spiele das Video ein paar Sekunden ab und versuche es erneut — der Stream muss erst laden.',
     MEDIA_PROTECTED:
       'Der Inhalt ist geschützt (verschlüsselt). Eine Audio-Transkription ist nicht möglich.',
+    MEDIA_TOO_LARGE:
+      'Dieses Video ist zu groß, um es im Speicher zu verarbeiten. Versuche ein kürzeres.',
     AUDIO_EXTRACTION_FAILED: 'Das Isolieren der Audiospur ist fehlgeschlagen.',
     TRANSCRIPTION_API_ERROR: 'Der Transkriptionsdienst hat einen Fehler zurückgegeben.',
     TIMEOUT: 'Die Verarbeitung hat das Zeitlimit überschritten. Versuche ein kürzeres Video.',
     UNSUPPORTED_PROVIDER: 'Dieser Anbieter wird noch nicht unterstützt.',
     SUMMARY_API_ERROR: 'Die Zusammenfassung konnte nicht erstellt werden.',
+    INTERRUPTED:
+      'Unterbrochen — der Worker der Erweiterung wurde neu gestartet. Du kannst es erneut starten.',
     UNKNOWN: 'Ein unerwarteter Fehler ist aufgetreten.',
   },
   onboarding: {

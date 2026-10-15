@@ -7,11 +7,21 @@ import {
   getActiveJob,
   getBatchState,
   cancelJob,
+  restoreJobs,
 } from './orchestrator';
 import { installMediaCapture } from './media-capture';
 import { enrichVideos } from './enrich';
 
 installMediaCapture();
+
+/**
+ * Hydrate persisted job state on worker wake-up. MV3 kills idle workers at any
+ * time; every handler that reads or writes job state awaits this promise so a
+ * revived worker never reports `idle` for a job that was running when its
+ * predecessor died, and never lets a fresh job race the restore. Started
+ * synchronously so a message can only race it, never miss it.
+ */
+const jobsReady = restoreJobs();
 
 /**
  * Service worker entry point (spec §2.2).
@@ -86,26 +96,38 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === 'GET_JOB_STATE') {
-      sendResponse({ ok: true, state: getJobState(message.videoId) });
-      return false;
+      void (async () => {
+        await jobsReady;
+        sendResponse({ ok: true, state: getJobState(message.videoId) });
+      })();
+      return true; // async response — job state may still be restoring
     }
 
     if (message.type === 'GET_ACTIVE_JOB') {
-      sendResponse({ ok: true, active: getActiveJob() });
-      return false;
+      void (async () => {
+        await jobsReady;
+        sendResponse({ ok: true, active: getActiveJob() });
+      })();
+      return true; // async response
     }
 
     if (message.type === 'SUMMARIZE') {
-      // Fire and forget — the job runs in the worker; progress is broadcast.
-      void runJob(message.video, broadcast);
-      sendResponse({ ok: true });
-      return false;
+      void (async () => {
+        await jobsReady;
+        // Fire and forget — the job runs in the worker; progress is broadcast.
+        void runJob(message.video, broadcast);
+        sendResponse({ ok: true });
+      })();
+      return true; // async response
     }
 
     if (message.type === 'SUMMARIZE_BATCH') {
-      void runBatch(message.videos, broadcast, broadcastBatch);
-      sendResponse({ ok: true });
-      return false;
+      void (async () => {
+        await jobsReady;
+        void runBatch(message.videos, broadcast, broadcastBatch);
+        sendResponse({ ok: true });
+      })();
+      return true; // async response
     }
 
     if (message.type === 'GET_BATCH_STATE') {
@@ -114,9 +136,12 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.type === 'CANCEL') {
-      cancelJob(message.videoId);
-      sendResponse({ ok: true });
-      return false;
+      void (async () => {
+        await jobsReady;
+        cancelJob(message.videoId);
+        sendResponse({ ok: true });
+      })();
+      return true; // async response
     }
 
     return false;

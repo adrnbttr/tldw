@@ -32,8 +32,22 @@ export interface TranscribeJob {
 
 export type OffscreenRequest = { type: 'OFFSCREEN_TRANSCRIBE'; job: TranscribeJob };
 
+/**
+ * Coarse pipeline phase attached to each progress message, so the worker can
+ * time the phases separately: download/extract get a fixed budget,
+ * transcription one proportional to the media duration.
+ */
+export type OffscreenProgressPhase = 'download' | 'extract' | 'transcribe';
+
 export type OffscreenResponse =
-  | { type: 'OFFSCREEN_PROGRESS'; videoId: string; detail: string }
+  | {
+      type: 'OFFSCREEN_PROGRESS';
+      videoId: string;
+      phase: OffscreenProgressPhase;
+      detail: string;
+      /** Resolved media duration in seconds, once extraction has probed it. */
+      duration?: number;
+    }
   | {
       type: 'OFFSCREEN_RESULT';
       videoId: string;
