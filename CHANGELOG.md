@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-17
+
 ### Added
 
 - **Multi-video dashboard.** The popup list is now a live dashboard: every video on
@@ -52,6 +54,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   native media URL and the orchestrator skips straight to transcription.
 - Repo hygiene: `SECURITY.md`, `CODE_OF_CONDUCT.md`, `.editorconfig`, Dependabot,
   `docs/SCREENSHOTS.md`, and a one-command `install.sh`.
+- **Diagnostic report.** Settings → Diagnostic → Copy / Download / Clear: a report
+  assembled from logs persisted across every context (worker, offscreen, content,
+  popup), with secrets and signed URLs masked — everything stays local, nothing is
+  ever sent.
+- **Release tooling.** `npm run build:test` and `npm run release:check` gate a
+  release, packaging no longer requires the `zip` binary, and `docs/RELEASING.md`
+  documents the procedure.
 
 ### Fixed
 
@@ -78,3 +87,4 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Isolated `Transcriber` interface for the audio fallback.
 
 [Unreleased]: https://github.com/adrnbttr/tldw/commits/main
+[0.3.0]: https://github.com/adrnbttr/tldw/compare/v0.2.0...v0.3.0
