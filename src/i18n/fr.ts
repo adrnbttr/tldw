@@ -15,6 +15,7 @@ export const fr: Messages = {
     summarizeSelection: (count) => `Résumer la sélection (${count})`,
     summarizeAll: (count) => `Résumer tout (${count})`,
     view: 'Voir',
+    copyReport: 'Copier le rapport',
     overview: (total, done) =>
       `${total} vidéo${total > 1 ? 's' : ''}${done > 0 ? ` · ${done} résumée${done > 1 ? 's' : ''}` : ''}`,
     batchProgress: (done, total) => `${done}/${total}`,
@@ -72,6 +73,13 @@ export const fr: Messages = {
     sectionSummary: 'Résumé',
     downloadFormat: 'Format d’export par défaut',
     formatLabels: { pdf: 'PDF', docx: 'Word' },
+    sectionDiagnostic: 'Diagnostic',
+    diagnosticHint:
+      'Le rapport est généré localement, rien ne quitte votre appareil, et il ne contient jamais vos clés API.',
+    diagnosticCopy: 'Copier le rapport',
+    diagnosticDownload: 'Télécharger',
+    diagnosticClear: 'Effacer les logs',
+    logsCleared: 'Logs effacés ✓',
     replayOnboarding: 'Revoir le tutoriel',
     save: 'Enregistrer',
     saved: 'Enregistré ✓',

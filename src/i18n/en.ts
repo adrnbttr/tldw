@@ -15,6 +15,7 @@ export const en: Messages = {
     summarizeSelection: (count) => `Summarize selection (${count})`,
     summarizeAll: (count) => `Summarize all (${count})`,
     view: 'View',
+    copyReport: 'Copy report',
     overview: (total, done) =>
       `${total} video${total > 1 ? 's' : ''}${done > 0 ? ` · ${done} summarized` : ''}`,
     batchProgress: (done, total) => `${done}/${total}`,
@@ -72,6 +73,13 @@ export const en: Messages = {
     sectionSummary: 'Summary',
     downloadFormat: 'Default export format',
     formatLabels: { pdf: 'PDF', docx: 'Word' },
+    sectionDiagnostic: 'Diagnostic',
+    diagnosticHint:
+      'The report is generated locally, nothing leaves your device, and it never contains your API keys.',
+    diagnosticCopy: 'Copy the report',
+    diagnosticDownload: 'Download',
+    diagnosticClear: 'Clear logs',
+    logsCleared: 'Logs cleared ✓',
     replayOnboarding: 'Replay the intro',
     save: 'Save',
     saved: 'Saved ✓',

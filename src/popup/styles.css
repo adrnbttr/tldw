@@ -234,6 +234,12 @@ button.secondary {
   width: 100%;
 }
 
+/* Destructive variant (e.g. "clear logs"). */
+button.secondary.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 .steps {
   list-style: none;
   margin: 0 0 16px;
@@ -429,6 +435,7 @@ button.secondary {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
 }
@@ -484,6 +491,14 @@ button.secondary {
 
 .settings-section:first-of-type {
   margin-top: 4px;
+}
+
+/* Short muted explanation under a settings section (diagnostic). */
+.settings-hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0 0 10px;
 }
 
 /* ── Onboarding ─────────────────────────────────────────────── */
@@ -662,7 +677,8 @@ button.secondary {
   animation: spin 0.8s linear infinite;
 }
 
-.cancel-link {
+.cancel-link,
+.diag-link {
   background: none;
   border: none;
   cursor: pointer;
@@ -673,7 +689,8 @@ button.secondary {
   text-decoration: underline;
 }
 
-.cancel-link:hover {
+.cancel-link:hover,
+.diag-link:hover {
   color: var(--fg);
 }
 
@@ -786,4 +803,8 @@ button.secondary {
   cursor: pointer;
   color: var(--fg);
   padding: 10px 12px;
+}
+
+.actions + button.primary {
+  margin-top: 12px;
 }

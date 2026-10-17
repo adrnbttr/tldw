@@ -8,6 +8,7 @@ import type {
   Response,
 } from '@/types';
 import type { BatchState } from '@/types';
+import { getSettings } from '@/storage';
 import { sanitizeEntry } from '@/shared/logger';
 import { log, logStore } from './log';
 import {
@@ -15,10 +16,13 @@ import {
   runBatch,
   getJobState,
   getActiveJob,
+  getJobsSnapshot,
   getBatchState,
   cancelJob,
   restoreJobs,
 } from './orchestrator';
+import { assembleDiagnosticsReport } from './diagnostics-handler';
+import type { DiagnosticsSources } from './diagnostics-handler';
 import { installMediaCapture } from './media-capture';
 import { enrichVideos } from './enrich';
 
@@ -203,6 +207,31 @@ chrome.runtime.onMessage.addListener(
         sendResponse({ ok: true });
       })();
       return true; // async response
+    }
+
+    if (message.type === 'GET_DIAGNOSTICS') {
+      void (async () => {
+        try {
+          await jobsReady; // the jobs snapshot may still be restoring
+          sendResponse({
+            ok: true,
+            report: await assembleDiagnosticsReport({
+              settings: getSettings,
+              jobs: getJobsSnapshot,
+              logs: () => logStore.readAll(),
+              manifest: () => chrome.runtime.getManifest(),
+              userAgent: () => navigator.userAgent,
+              // Vite injects the constant (vite.config.ts `define`); outside a
+              // Vite bundle it stays undefined — the report then shows (none)
+              // under ## Build instead of a ReferenceError.
+              build: () => (typeof __TLDW_BUILD__ !== 'undefined' ? __TLDW_BUILD__ : null),
+            } satisfies DiagnosticsSources),
+          });
+        } catch {
+          sendResponse({ ok: false, code: 'UNKNOWN', message: 'diagnostics unavailable' });
+        }
+      })();
+      return true; // async response — the sources read storage
     }
 
     return false;

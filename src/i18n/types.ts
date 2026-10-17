@@ -40,6 +40,8 @@ export interface Messages {
     summarizeSelection: (count: number) => string;
     summarizeAll: (count: number) => string;
     view: string;
+    /** Error row: copy the local diagnostic report for a bug report. */
+    copyReport: string;
     /** Overview line, e.g. "2 videos · 1 summarized". */
     overview: (total: number, done: number) => string;
     batchProgress: (done: number, total: number) => string;
@@ -94,6 +96,13 @@ export interface Messages {
     sectionSummary: string;
     downloadFormat: string;
     formatLabels: Record<DownloadFormat, string>;
+    /** Diagnostic section — local report, nothing sent, no API keys inside. */
+    sectionDiagnostic: string;
+    diagnosticHint: string;
+    diagnosticCopy: string;
+    diagnosticDownload: string;
+    diagnosticClear: string;
+    logsCleared: string;
     replayOnboarding: string;
     save: string;
     saved: string;

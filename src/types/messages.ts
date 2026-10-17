@@ -50,7 +50,8 @@ export type Request =
   | { type: 'GET_BATCH_STATE' }
   | { type: 'CANCEL'; videoId: string }
   | { type: 'GET_LOGS' }
-  | { type: 'CLEAR_LOGS' };
+  | { type: 'CLEAR_LOGS' }
+  | { type: 'GET_DIAGNOSTICS' };
 
 /** The running/most-recent job with its video, for popup restore (F2). */
 export interface ActiveJob {
@@ -86,6 +87,7 @@ export type Response =
   | { ok: true; batch: BatchState }
   | { ok: true; active: ActiveJob | null }
   | { ok: true; logs: LogEntry[] }
+  | { ok: true; report: string }
   | { ok: true }
   | { ok: false; code: TldwErrorCode; message: string };
 

@@ -16,7 +16,7 @@ import { summarize, summarizeYouTubeVideo } from '@/summarizer';
 import { getCatalog, isLocale } from '@/i18n';
 import { getSettings, saveSummary, findCachedSummary } from '@/storage';
 import { markInterrupted, sessionJobStore, snapshotOf } from './job-store';
-import type { JobStore } from './job-store';
+import type { JobStore, JobsSnapshot } from './job-store';
 import { log } from './log';
 import { loggableUrl } from './loggable-url';
 
@@ -96,6 +96,16 @@ export function getActiveJob(): { video: DetectedVideo; state: JobState } | null
   const video = jobVideos.get(lastJobId);
   const state = jobs.get(lastJobId);
   return video && state ? { video, state } : null;
+}
+
+/**
+ * The whole live picture at once, for the diagnostic report
+ * (src/shared/diagnostics.ts) — unlike a raw session-store read, this reflects
+ * the post-restore state a revived worker actually holds (INTERRUPTED
+ * instead of stale `running`).
+ */
+export function getJobsSnapshot(): JobsSnapshot {
+  return snapshotOf(jobs, lastJobId);
 }
 
 let batchState: BatchState = { phase: 'idle' };

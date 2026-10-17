@@ -2,6 +2,7 @@ import type { DetectedVideo, JobState, Summary } from '@/types';
 import { formatDuration } from '@/shared/format';
 import { useI18n } from '@/i18n/context';
 import { cancel } from '../messaging';
+import { useDiagnosticCopy } from '../diagnostic-actions';
 
 interface Props {
   videos: DetectedVideo[];
@@ -16,6 +17,17 @@ interface Props {
 }
 
 const treatable = (v: DetectedVideo) => v.provider !== 'unknown';
+
+/** Error-row "copy report" link — own state, so the feedback shows only on its row. */
+function CopyReportButton() {
+  const t = useI18n();
+  const { copied, copyDiagnostic } = useDiagnosticCopy();
+  return (
+    <button class="diag-link" onClick={() => void copyDiagnostic()}>
+      {copied ? t.result.copied : t.list.copyReport}
+    </button>
+  );
+}
 
 function providerLabel(p: DetectedVideo['provider'], videoLabel: string): string {
   if (p === 'youtube') return 'YouTube';
@@ -149,6 +161,7 @@ export function VideoList({
                       <button class="secondary" onClick={() => onSummarize(video)}>
                         {t.list.summarize}
                       </button>
+                      <CopyReportButton />
                     </div>
                   ) : (
                     <button

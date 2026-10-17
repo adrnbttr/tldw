@@ -43,3 +43,13 @@ export async function getBatchState(): Promise<BatchState> {
   const res = await send({ type: 'GET_BATCH_STATE' });
   return res.ok && 'batch' in res ? res.batch : { phase: 'idle' };
 }
+
+/** Full diagnostic report text (local, keys redacted) built by the worker. */
+export async function getDiagnosticReport(): Promise<string> {
+  const res = await send({ type: 'GET_DIAGNOSTICS' });
+  return res.ok && 'report' in res ? res.report : '';
+}
+
+export async function clearLogs(): Promise<void> {
+  await send({ type: 'CLEAR_LOGS' });
+}

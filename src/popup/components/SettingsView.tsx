@@ -2,6 +2,8 @@ import { useEffect, useState } from 'preact/hooks';
 import type { DetailLevel, DownloadFormat, Settings, Theme, TranscriptionProvider } from '@/types';
 import { AVAILABLE_MODELS, DEFAULT_SETTINGS } from '@/types';
 import { getSettings, saveSettings } from '@/storage';
+import { clearLogs } from '../messaging';
+import { downloadDiagnosticReport, useDiagnosticCopy } from '../diagnostic-actions';
 import type { Locale } from '@/i18n';
 import { SUPPORTED_LOCALES, LOCALE_LABELS, isLocale } from '@/i18n';
 import { useI18n } from '@/i18n/context';
@@ -54,6 +56,15 @@ export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Pr
     await saveSettings(settings);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
+  };
+
+  const { copied, copyDiagnostic } = useDiagnosticCopy();
+  const [cleared, setCleared] = useState(false);
+
+  const clear = async () => {
+    await clearLogs();
+    setCleared(true);
+    setTimeout(() => setCleared(false), 1500);
   };
 
   return (
@@ -182,6 +193,22 @@ export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Pr
           ))}
         </select>
       </label>
+
+      <h2 class="settings-section">{t.settings.sectionDiagnostic}</h2>
+
+      <p class="settings-hint">{t.settings.diagnosticHint}</p>
+
+      <div class="actions">
+        <button class="secondary" onClick={() => void copyDiagnostic()}>
+          {copied ? t.result.copied : t.settings.diagnosticCopy}
+        </button>
+        <button class="secondary" onClick={() => void downloadDiagnosticReport()}>
+          {t.settings.diagnosticDownload}
+        </button>
+        <button class="secondary danger" onClick={() => void clear()}>
+          {cleared ? t.settings.logsCleared : t.settings.diagnosticClear}
+        </button>
+      </div>
 
       <button class="primary" onClick={() => void save()}>
         {saved ? t.settings.saved : t.settings.save}

@@ -15,6 +15,7 @@ export const de: Messages = {
     summarizeSelection: (count) => `Auswahl zusammenfassen (${count})`,
     summarizeAll: (count) => `Alle zusammenfassen (${count})`,
     view: 'Ansehen',
+    copyReport: 'Bericht kopieren',
     overview: (total, done) =>
       `${total} Video${total > 1 ? 's' : ''}${done > 0 ? ` · ${done} zusammengefasst` : ''}`,
     batchProgress: (done, total) => `${done}/${total}`,
@@ -72,6 +73,13 @@ export const de: Messages = {
     sectionSummary: 'Zusammenfassung',
     downloadFormat: 'Standard-Exportformat',
     formatLabels: { pdf: 'PDF', docx: 'Word' },
+    sectionDiagnostic: 'Diagnose',
+    diagnosticHint:
+      'Der Bericht wird lokal erzeugt, nichts verlässt dein Gerät, und er enthält niemals deine API-Schlüssel.',
+    diagnosticCopy: 'Bericht kopieren',
+    diagnosticDownload: 'Herunterladen',
+    diagnosticClear: 'Logs löschen',
+    logsCleared: 'Logs gelöscht ✓',
     replayOnboarding: 'Einführung erneut ansehen',
     save: 'Speichern',
     saved: 'Gespeichert ✓',
