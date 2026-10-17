@@ -29,16 +29,13 @@ Constats sur ce poste :
    `detail`, ex. `sample=… kinds=…`) ; ou, si ça « tourne » sans fin : quelle étape
    reste active (`captions` / `audio_capture` / `transcription` / `summarize`), le
    texte de détail, et depuis combien de temps.
-3. **Console du service worker** : `chrome://extensions` → carte tldw → lien
-   « service worker » → onglet Console : copier les erreurs.
-4. **Console de l'offscreen document** : `chrome://extensions` → « Inspecter les
-   vues » → `offscreen.html` : chercher les lignes `[tldw] captured sources` et
-   `[tldw] audio fallback failed`.
-5. **Onglet Network** des DevTools de la page Drive, filtre `videoplayback` : nombre
+3. **Rapport de diagnostic** : Réglages → Diagnostic → « Copier le rapport », et le
+   coller (récupère d'un coup les erreurs du service worker et de l'offscreen).
+4. **Onglet Network** des DevTools de la page Drive, filtre `videoplayback` : nombre
    de requêtes, domaine (`googlevideo.com`), présence de `range=`, `mime=`.
-6. **Réglages** : fournisseur de transcription (OpenRouter / Whisper), modèle audio,
+5. **Réglages** : fournisseur de transcription (OpenRouter / Whisper), modèle audio,
    modèle de résumé, délai (`timeoutSeconds`, défaut 15 min).
-7. **Si possible** : durée exacte de la vidéo et taille du fichier Drive.
+6. **Si possible** : durée exacte de la vidéo et taille du fichier Drive.
 
 ## Coût d'1 h
 

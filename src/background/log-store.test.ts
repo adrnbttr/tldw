@@ -107,6 +107,46 @@ describe('createLogStore', () => {
     expect((await small.readAll()).map((l) => l.msg)).toEqual(['d', 'e', 'f']);
   });
 
+  /** ~1 KiB serialized per entry — sized to make the byte budget bite. */
+  const big = (m: string): LogEntry => ({
+    t: 0,
+    level: 'info',
+    source: 'sw',
+    msg: m,
+    data: 'x'.repeat(1000),
+  });
+
+  it('bounds the persisted buffer by serialized bytes, evicting the oldest', async () => {
+    const small = createLogStore(area, { capacity: 10, budgetBytes: 2400 });
+    for (const m of ['a', 'b', 'c', 'd']) small.append(big(m));
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Only the newest ~2 KiB fit the budget — the oldest entries are evicted.
+    expect((await small.readAll()).map((l) => l.msg)).toEqual(['c', 'd']);
+    const persisted = area.set.mock.calls.at(-1)?.[0]?.[LOGS_KEY] as LogEntry[];
+    expect(JSON.stringify(persisted).length).toBeLessThanOrEqual(2400);
+  });
+
+  it('trims the merged history back under the byte budget across flushes', async () => {
+    const small = createLogStore(area, { capacity: 10, budgetBytes: 2400 });
+    for (const m of ['a', 'b']) small.append(big(m));
+    await vi.advanceTimersByTimeAsync(500); // both fit, stored
+    for (const m of ['c', 'd']) small.append(big(m));
+    await vi.advanceTimersByTimeAsync(500); // merged history exceeds — trimmed
+
+    expect((await small.readAll()).map((l) => l.msg)).toEqual(['c', 'd']);
+  });
+
+  it('evicts an unserializable entry instead of wedging every future write', async () => {
+    const poisoned: LogEntry = { t: 0, level: 'info', source: 'sw', msg: 'boom', data: { n: 10n } };
+    store.append(poisoned);
+    store.append(entry('after'));
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(area.set).toHaveBeenCalledOnce();
+    expect(await store.readAll()).toEqual([entry('after')]);
+  });
+
   it('flushes error entries immediately, without waiting for the debounce', async () => {
     store.append(entry('boom', 0, 'error'));
     await store.readAll(); // awaits the in-flight flush chain
@@ -125,6 +165,17 @@ describe('createLogStore', () => {
 
     expect(area.set).toHaveBeenCalledOnce();
     expect((await store.readAll()).map((l) => l.msg)).toEqual(['info line', 'boom']);
+  });
+
+  it('flushes warn entries immediately too, without waiting for the debounce', async () => {
+    store.append(entry('careful', 0, 'warn'));
+    await store.readAll(); // awaits the in-flight flush chain
+
+    expect(area.set).toHaveBeenCalledOnce();
+    expect((await store.readAll()).map((l) => l.msg)).toEqual(['careful']);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(area.set).toHaveBeenCalledOnce(); // no leftover debounce flush
   });
 
   it('readAll folds queued entries into the stored history, chronologically', async () => {
@@ -179,6 +230,38 @@ describe('createLogStore', () => {
     const logs = await small.readAll();
     expect(logs).toHaveLength(3); // pending is capped at the capacity
     expect(logs.at(-1)?.msg).toBe('x7');
+  });
+
+  it('drops the batch after 3 consecutive failed flushes, without requeueing forever', async () => {
+    area.set.mockRejectedValue(new Error('QUOTA_BYTES'));
+    store.append(entry('a'));
+    await vi.advanceTimersByTimeAsync(500); // failure #1 — requeued
+    await vi.advanceTimersByTimeAsync(500); // failure #2 — requeued
+    await vi.advanceTimersByTimeAsync(500); // failure #3 — dropped
+    expect(area.set).toHaveBeenCalledTimes(3);
+
+    expect(await store.readAll()).toEqual([]); // the batch is gone
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(area.set).toHaveBeenCalledTimes(3); // no further retries
+
+    // A fresh batch gets a fresh attempt count — the drop reset it.
+    store.append(entry('b'));
+    await vi.advanceTimersByTimeAsync(500); // failure #1 of the new batch
+    expect(area.set).toHaveBeenCalledTimes(4);
+    expect(await store.readAll()).toEqual([entry('b')]); // requeued, not dropped
+  });
+
+  it('drops the batch on the first failure when maxFlushAttempts is 1', async () => {
+    area.set.mockRejectedValue(new Error('QUOTA_BYTES'));
+    const strict = createLogStore(area, { maxFlushAttempts: 1 });
+    strict.append(entry('a'));
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(area.set).toHaveBeenCalledOnce();
+    expect(await strict.readAll()).toEqual([]);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(area.set).toHaveBeenCalledOnce(); // dropped, never requeued
   });
 
   it('readAll skips invalid entries found in storage', async () => {

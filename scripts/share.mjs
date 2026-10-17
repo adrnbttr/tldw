@@ -8,6 +8,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, rmSync, mkdirSync, cpSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { createZip } from './lib/zip.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
@@ -79,13 +80,7 @@ writeFileSync(join(stage, 'INSTALL.txt'), INSTALL_TXT);
 
 rmSync(join(root, zipName), { force: true });
 console.log(`› Packaging → ${zipName}`);
-execSync(
-  `cd "${stage}" && zip -r -q "${join(root, zipName)}" tldw-extension INSTALL.txt -x '*.map'`,
-  {
-    stdio: 'inherit',
-    shell: '/bin/bash',
-  },
-);
+createZip(stage, join(root, zipName), { exclude: ['*.map'] });
 rmSync(stage, { recursive: true, force: true });
 
 console.log(`✓ ${zipName} ready — email it to your colleague. See docs/INSTALL.md.`);

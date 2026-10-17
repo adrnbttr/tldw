@@ -194,7 +194,8 @@ npm run format   # apply Prettier
 
 To validate the extension in a real browser (phase by phase, with debugging tips),
 follow [`docs/TESTING.md`](./docs/TESTING.md), and [`docs/SCREENSHOTS.md`](./docs/SCREENSHOTS.md)
-to capture the README shots. Contributions are welcome — see
+to capture the README shots. To package and cut a release, see
+[`docs/RELEASING.md`](./docs/RELEASING.md). Contributions are welcome — see
 [`CONTRIBUTING.md`](./CONTRIBUTING.md) and the [`Code of Conduct`](./CODE_OF_CONDUCT.md).
 Security reports: [`SECURITY.md`](./SECURITY.md).
 

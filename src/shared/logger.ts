@@ -42,11 +42,17 @@ const GITLAB_TOKEN = /\bglpat-[\w-]{10,}/g;
 const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9-._~+/=]+/gi;
 const QUERY_SECRET =
   /(\b(?:access_token|client_secret|x-goog-signature|signature|token|sig|key)=)[^&\s"']+/gi;
+/** Same secrets in path form — googlevideo/Drive signed URLs also travel as
+ * `/expire/<unix>/<…>/sig/<token>` or `…/signature/<token>` path segments. */
+const PATH_SECRET = /\/(expire|signature|sig)\/([^/?&\s"']+)/g;
 const KEY_FIELD = /key$/i;
 const SECRET_FIELD = /(token|secret|password|passphrase|credential)/i;
 
 const LOG_LEVELS = new Set<string>(['debug', 'info', 'warn', 'error']);
 const LOG_SOURCES = new Set<string>(['sw', 'offscreen', 'content', 'popup']);
+
+/** How far a wired entry's clock may legitimately skew: one hour, either way. */
+const MAX_ENTRY_SKEW_MS = 60 * 60 * 1000;
 
 /** Caps runaway strings, reporting how many characters were cut. */
 function truncate(value: string): string {
@@ -64,7 +70,8 @@ export function redactString(value: string): string {
       .replace(GITHUB_PAT, REDACTED)
       .replace(GITLAB_TOKEN, REDACTED)
       .replace(BEARER_TOKEN, 'Bearer [REDACTED]')
-      .replace(QUERY_SECRET, `$1${REDACTED}`),
+      .replace(QUERY_SECRET, `$1${REDACTED}`)
+      .replace(PATH_SECRET, `/$1/${REDACTED}`),
   );
 }
 
@@ -151,14 +158,22 @@ function jsonSize(entry: LogEntry): number {
   }
 }
 
+/** True for a finite timestamp within ±1 h of now. */
+function isPlausibleTime(t: number): boolean {
+  return Number.isFinite(t) && Math.abs(Date.now() - t) <= MAX_ENTRY_SKEW_MS;
+}
+
 /**
  * Validates and normalizes an untrusted `LOG` payload before it enters the
- * buffer: malformed entries are rejected, `msg` and `data` are re-redacted
- * (never trust the sender's own redaction) and an oversized `data` is dropped
- * so a single line can't blow the storage budget.
+ * buffer: malformed entries are rejected, along with any entry whose `t`
+ * strays more than an hour from now (or isn't finite) — a forged or stale
+ * clock must not corrupt the buffer's chronology. `msg` and `data` are
+ * re-redacted (never trust the sender's own redaction) and an oversized
+ * `data` is dropped so a single line can't blow the storage budget.
  */
 export function sanitizeEntry(raw: unknown): LogEntry | null {
   if (!isLogEntry(raw)) return null;
+  if (!isPlausibleTime(raw.t)) return null;
   const entry: LogEntry = {
     t: raw.t,
     level: raw.level,

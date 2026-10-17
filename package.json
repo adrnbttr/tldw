@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:test": "node scripts/build-test.mjs",
     "preview": "vite preview",
     "predev": "node scripts/copy-ffmpeg.mjs",
     "prebuild": "node scripts/copy-ffmpeg.mjs",
@@ -18,6 +19,7 @@
     "test:watch": "vitest",
     "icons": "node scripts/gen-icons.mjs",
     "package": "node scripts/package.mjs",
+    "release:check": "node scripts/release-check.mjs",
     "share": "node scripts/share.mjs",
     "share:lite": "node scripts/share.mjs --lite"
   },

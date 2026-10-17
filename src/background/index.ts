@@ -11,6 +11,7 @@ import type { BatchState } from '@/types';
 import { getSettings } from '@/storage';
 import { sanitizeEntry } from '@/shared/logger';
 import { log, logStore } from './log';
+import { isExtensionPageSender } from './sender-guard';
 import {
   runJob,
   runBatch,
@@ -28,9 +29,9 @@ import { enrichVideos } from './enrich';
 
 /**
  * Last-ditch error nets: whatever escapes every handler below still lands in
- * the central buffer as an error entry — persisted immediately, since error
- * entries skip the store's debounce — so a dying worker's last words are not
- * lost with it.
+ * the central buffer as an error entry — persisted immediately, since warn
+ * and error entries skip the store's debounce — so a dying worker's last
+ * words are not lost with it.
  */
 self.addEventListener('error', (event) => {
   log.error('uncaught error', {
@@ -66,6 +67,7 @@ const jobsReady = restoreJobs();
  *
  * - caches detected videos per tab (pushed by the content script)
  * - routes popup requests
+ * - refuses log/diagnostics requests from outside the extension's own pages
  * - broadcasts job progress so the popup can re-subscribe after reopening (F2)
  */
 
@@ -192,6 +194,20 @@ chrome.runtime.onMessage.addListener(
         sendResponse({ ok: true });
       })();
       return true; // async response
+    }
+
+    // Privileged log requests — the buffer and the diagnostics report carry
+    // settings-adjacent data. Only the extension's own pages may ask for them:
+    // a content script (a tab is set) or another extension (a foreign
+    // sender.id) is refused outright.
+    if (
+      (message.type === 'GET_LOGS' ||
+        message.type === 'CLEAR_LOGS' ||
+        message.type === 'GET_DIAGNOSTICS') &&
+      !isExtensionPageSender(sender, chrome.runtime.id)
+    ) {
+      sendResponse({ ok: false, code: 'UNKNOWN', message: 'forbidden' });
+      return false;
     }
 
     if (message.type === 'GET_LOGS') {

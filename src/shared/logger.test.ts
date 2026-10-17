@@ -43,6 +43,23 @@ describe('redact', () => {
     );
   });
 
+  it('masks signed-media path segments — googlevideo/Drive URLs in path form', () => {
+    expect(
+      redact(
+        'https://rr3---sn-4g5e6nzs.googlevideo.com/videoplayback/expire/1728921600/sig/APq89FMAAAA-9P0lUq3f2R8l5x8lAKOAoyWmBFcO./itag/140/source/youtube/requiressl/yes',
+      ),
+    ).toBe(
+      'https://rr3---sn-4g5e6nzs.googlevideo.com/videoplayback/expire/[REDACTED]/sig/[REDACTED]/itag/140/source/youtube/requiressl/yes',
+    );
+    expect(
+      redact(
+        'https://drive.usercontent.google.com/d/expire/1728921600/signature/AMl-mkn0123456789abcdef/file.mp4',
+      ),
+    ).toBe(
+      'https://drive.usercontent.google.com/d/expire/[REDACTED]/signature/[REDACTED]/file.mp4',
+    );
+  });
+
   it('masks the values of fields whose name ends with Key, whatever the case', () => {
     expect(redact({ openRouterKey: 'zzz', apiKey: 'zzz', APIKEY: 'zzz', name: 'kept' })).toEqual({
       openRouterKey: '[REDACTED]',
@@ -176,16 +193,30 @@ describe('createLogger', () => {
 });
 
 describe('sanitizeEntry', () => {
-  const valid = { t: 123, level: 'warn', source: 'content', msg: 'hello', data: { apiKey: 'zzz' } };
+  const valid = {
+    t: Date.now(),
+    level: 'warn',
+    source: 'content',
+    msg: 'hello',
+    data: { apiKey: 'zzz' },
+  };
 
   it('accepts a well-formed entry and re-redacts msg and data', () => {
     expect(sanitizeEntry(valid)).toEqual({
-      t: 123,
+      t: valid.t,
       level: 'warn',
       source: 'content',
       msg: 'hello',
       data: { apiKey: '[REDACTED]' },
     });
+  });
+
+  it('accepts a timestamp skewed within the hour, either way', () => {
+    const skew = 59 * 60 * 1000; // safely inside ±1 h
+    const past = Date.now() - skew;
+    const future = Date.now() + skew;
+    expect(sanitizeEntry({ ...valid, t: past })?.t).toBe(past);
+    expect(sanitizeEntry({ ...valid, t: future })?.t).toBe(future);
   });
 
   it('redacts and truncates an oversized msg', () => {
@@ -202,6 +233,16 @@ describe('sanitizeEntry', () => {
     ['a bare string', 'not an entry'],
     ['a missing t', { level: 'info', source: 'sw', msg: 'm' }],
     ['a non-number t', { t: '123', level: 'info', source: 'sw', msg: 'm' }],
+    ['a NaN t', { t: Number.NaN, level: 'info', source: 'sw', msg: 'm' }],
+    ['an infinite t', { t: Number.POSITIVE_INFINITY, level: 'info', source: 'sw', msg: 'm' }],
+    [
+      'a t an hour too old',
+      { t: Date.now() - 61 * 60 * 1000, level: 'info', source: 'sw', msg: 'm' },
+    ],
+    [
+      'a t an hour too fresh',
+      { t: Date.now() + 61 * 60 * 1000, level: 'info', source: 'sw', msg: 'm' },
+    ],
     ['an unknown level', { t: 1, level: 'loud', source: 'sw', msg: 'm' }],
     ['an unknown source', { t: 1, level: 'info', source: 'nirvana', msg: 'm' }],
     ['a non-string msg', { t: 1, level: 'info', source: 'sw', msg: 42 }],

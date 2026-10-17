@@ -33,6 +33,11 @@ OpenRouter key covers the whole extension — no separate transcription account.
 
 ### Where to look when something fails
 
+Quickest way: open the popup → ⚙ **Settings → Diagnostic → "Copy report"** (the
+same link is offered on any error row). The report bundles the typed error,
+recent logs, and environment details in one paste — generated locally, with no
+API keys and nothing sent anywhere.
+
 No failure is silent — every error shows a typed message. To see *why*, open the
 right console:
 
@@ -209,4 +214,5 @@ Save PNGs to `.github/assets/screenshots/` and reference them from the
 
 Found a bug? Open an [issue](https://github.com/adrnbttr/tldw/issues) with the typed
 error code, the provider (YouTube/Vimeo), and the relevant console output — **never
-paste your API keys**.
+paste your API keys**. To package a build or cut a release, see
+[`RELEASING.md`](./RELEASING.md).
