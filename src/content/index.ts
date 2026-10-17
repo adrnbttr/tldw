@@ -8,6 +8,10 @@ import {
   pageVideoFromUrl,
   providerFromUrl,
 } from './detect';
+import { createClientLogger } from '@/shared/logger-client';
+
+/** Content logger — ships to the worker's buffer; no echo, the page's console stays untouched. */
+const log = createClientLogger('content');
 
 /** Strips the provider suffix a watch page adds to document.title. */
 function cleanTitle(title: string): string {
@@ -125,6 +129,12 @@ function publish(): void {
   const signature = videos.map((v) => `${v.provider}:${v.externalId}`).join('|');
   if (signature === lastSignature) return;
   lastSignature = signature;
+
+  // Changed result only — a mutation burst must not spam the log buffer.
+  log.info('videos detected', {
+    count: videos.length,
+    providers: [...new Set(videos.map((v) => v.provider))],
+  });
 
   const message: ContentMessage = { type: 'VIDEOS_DETECTED', videos };
   chrome.runtime.sendMessage(message).catch(() => {

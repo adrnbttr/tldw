@@ -1,9 +1,13 @@
 import { TldwError } from '@/types';
+import { log } from '@/background/log';
 
 /**
  * Minimal OpenRouter chat client (F7).
  *
  * Called directly from the extension with the user's key. No backend, no proxy.
+ * Runs in the service worker, so it logs through the worker's own logger:
+ * model, HTTP status and response size only — never the Authorization header,
+ * the request body, or the key.
  */
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
@@ -58,6 +62,7 @@ export async function chat(options: ChatOptions): Promise<string> {
     });
   } catch (err) {
     if (signal?.aborted) throw new TldwError('TIMEOUT', 'Summary request aborted.');
+    log.warn('openrouter request failed', { model, error: String(err) });
     throw new TldwError('SUMMARY_API_ERROR', 'Network error calling OpenRouter.', String(err));
   }
 
@@ -65,10 +70,12 @@ export async function chat(options: ChatOptions): Promise<string> {
     const body = await safeText(response);
     const retry = response.headers.get('retry-after');
     const hint = retry ? `réessayez dans ${retry}s. ${body}` : body;
+    log.warn('openrouter quota exceeded', { model, status: response.status, retryAfter: retry });
     throw new TldwError('QUOTA_EXCEEDED', 'OpenRouter quota/credits exceeded.', hint.trim());
   }
   if (!response.ok) {
     const body = await safeText(response);
+    log.warn('openrouter api error', { model, status: response.status });
     throw new TldwError('SUMMARY_API_ERROR', `OpenRouter returned ${response.status}.`, body);
   }
 
@@ -77,8 +84,14 @@ export async function chat(options: ChatOptions): Promise<string> {
   };
   const content = data.choices?.[0]?.message?.content;
   if (!content) {
+    log.warn('openrouter empty response', { model, status: response.status });
     throw new TldwError('SUMMARY_API_ERROR', 'OpenRouter returned an empty response.');
   }
+  log.debug('openrouter response', {
+    model,
+    status: response.status,
+    chars: content.length,
+  });
   return content;
 }
 

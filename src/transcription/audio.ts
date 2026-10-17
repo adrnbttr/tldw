@@ -1,5 +1,6 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { TldwError } from '@/types';
+import { createClientLogger } from '@/shared/logger-client';
 
 /**
  * Audio extraction with ffmpeg.wasm (F5.3).
@@ -16,6 +17,9 @@ import { TldwError } from '@/types';
  * time window at a time as a compact mono 16 kHz MP3 — the video bytes and a
  * full-length MP3 never coexist in memory.
  */
+
+/** Offscreen logger — ships to the worker's buffer and echoes to DevTools. */
+const log = createClientLogger('offscreen', { echo: true });
 
 const AUDIO_BITRATE_KBPS = 64;
 /** Bytes per second of the extracted mono MP3, for window planning. */
@@ -116,8 +120,9 @@ export class FfmpegAudio {
     this.ffmpeg.on('log', ({ message }) => {
       this.log.push(message);
       if (this.log.length > 12) this.log.shift();
-      console.debug('[tldw ffmpeg]', message);
+      log.debug('ffmpeg', message);
     });
+    const started = performance.now();
     try {
       // No classWorkerURL → use the module worker Vite bundled (same-origin, CSP-ok).
       await this.ffmpeg.load({
@@ -125,8 +130,9 @@ export class FfmpegAudio {
         wasmURL: `${base}/ffmpeg-core.wasm`,
       });
       this.loaded = true;
+      log.info('ffmpeg loaded', { ms: Math.round(performance.now() - started) });
     } catch (err) {
-      console.error('[tldw] ffmpeg failed to load', err);
+      log.error('ffmpeg failed to load', err);
       throw new TldwError('AUDIO_EXTRACTION_FAILED', 'Failed to load ffmpeg.wasm.', String(err));
     }
   }
@@ -183,6 +189,7 @@ export class FfmpegAudio {
   async extractWindow(name: string, start: number, end: number): Promise<Uint8Array | null> {
     await this.load();
     const outName = 'window.mp3';
+    const started = performance.now();
     try {
       // -ss before -i: ffmpeg seeks straight into the source (no full decode).
       const code = await this.ffmpeg.exec([
@@ -206,6 +213,12 @@ export class FfmpegAudio {
       }
       const out = (await this.ffmpeg.readFile(outName)) as Uint8Array;
       if (!out || out.byteLength < AUDIO_BYTES_PER_SECOND / 2) return null;
+      log.debug('audio window extracted', {
+        start,
+        end,
+        bytes: out.byteLength,
+        ms: Math.round(performance.now() - started),
+      });
       return out;
     } catch (err) {
       throw new TldwError(

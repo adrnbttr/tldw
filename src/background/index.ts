@@ -22,6 +22,27 @@ import {
 import { installMediaCapture } from './media-capture';
 import { enrichVideos } from './enrich';
 
+/**
+ * Last-ditch error nets: whatever escapes every handler below still lands in
+ * the central buffer as an error entry — persisted immediately, since error
+ * entries skip the store's debounce — so a dying worker's last words are not
+ * lost with it.
+ */
+self.addEventListener('error', (event) => {
+  log.error('uncaught error', {
+    message: event.message,
+    stack: event.error instanceof Error ? event.error.stack : undefined,
+  });
+});
+
+self.addEventListener('unhandledrejection', (event) => {
+  const { reason } = event;
+  log.error('unhandled rejection', {
+    message: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+});
+
 installMediaCapture();
 
 // Startup breadcrumb — lands in the central log buffer, persisted by the store.

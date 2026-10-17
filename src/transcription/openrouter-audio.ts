@@ -1,4 +1,5 @@
 import { TldwError } from '@/types';
+import { createClientLogger } from '@/shared/logger-client';
 
 /**
  * Audio transcription via OpenRouter (F5, level 2 — default backend).
@@ -11,6 +12,9 @@ import { TldwError } from '@/types';
  * Each chunk request is bounded (explicit max_tokens, per-attempt timeout) and
  * retried with exponential backoff on transient failures (429/5xx/network).
  */
+
+/** Offscreen logger — ships to the worker's buffer and echoes to DevTools. */
+const log = createClientLogger('offscreen', { echo: true });
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -89,6 +93,8 @@ async function requestChunk(request: {
       signal: controller.signal,
     });
 
+    log.debug('openrouter response', { status: response.status });
+
     if (response.ok) {
       const data = (await response.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
@@ -124,6 +130,7 @@ async function requestChunk(request: {
           );
     return { ok: false, retryable, error };
   } catch (err) {
+    log.warn('openrouter request failed', { error: String(err) });
     if (request.signal?.aborted) {
       return {
         ok: false,

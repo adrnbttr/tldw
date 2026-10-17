@@ -1,4 +1,6 @@
 import type { DetectedVideo } from '@/types';
+import { log } from './log';
+import { loggableUrl } from './loggable-url';
 
 /**
  * Metadata enrichment for embedded videos.
@@ -26,9 +28,14 @@ async function fetchJson(url: string): Promise<Record<string, unknown> | null> {
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(url, { credentials: 'omit', signal: controller.signal });
+    log.debug('oembed fetch', { url: loggableUrl(url), status: res.status });
     if (!res.ok) return null;
     return (await res.json()) as Record<string, unknown>;
-  } catch {
+  } catch (err) {
+    log.debug('oembed fetch failed', {
+      url: loggableUrl(url),
+      error: err instanceof Error ? err.message : undefined,
+    });
     return null;
   } finally {
     clearTimeout(timer);

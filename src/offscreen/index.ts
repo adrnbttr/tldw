@@ -26,6 +26,7 @@ import { assembleChunkSegments, mergeChunkTranscripts, planChunks } from '@/tran
 import { planByteRanges } from '@/transcription/ranges';
 import { transcribeAudio } from '@/transcription/whisper';
 import { transcribeViaOpenRouter } from '@/transcription/openrouter-audio';
+import { createClientLogger } from '@/shared/logger-client';
 import { getCatalog, isLocale } from '@/i18n';
 import type { Messages } from '@/i18n';
 
@@ -40,6 +41,9 @@ import type { Messages } from '@/i18n';
  */
 
 const audio = new FfmpegAudio();
+
+/** Offscreen logger — ships to the worker's buffer and echoes to DevTools. */
+const log = createClientLogger('offscreen', { echo: true });
 
 /**
  * Duration assumed when neither the page nor the container reports one; the
@@ -68,6 +72,7 @@ async function runJob(job: TranscribeJob): Promise<void> {
 
   try {
     let mediaBytes: Uint8Array | null = await downloadSource(job, t, progress, diag);
+    log.info('media downloaded', { bytes: mediaBytes.byteLength });
     assertMediaSize(mediaBytes.byteLength);
 
     progress('extract', t.extractingAudio);
@@ -91,7 +96,11 @@ async function runJob(job: TranscribeJob): Promise<void> {
     // can show exactly what the host served.
     const base = err instanceof TldwError ? (err.providerMessage ?? '') : String(err);
     const detail = [diag.join(' '), base].filter(Boolean).join(' ‹ ');
-    console.error('[tldw] audio fallback failed', { code, detail, sources: job.sources });
+    log.error('audio fallback failed', {
+      code,
+      detail,
+      sources: job.sources.map((s) => `${s.kind}:${safePath(s.url)}`),
+    });
     report({ type: 'OFFSCREEN_RESULT', videoId: job.videoId, ok: false, code, message: detail });
   }
 }
@@ -233,10 +242,9 @@ async function downloadSource(
         .join(',') || 'none'
     }`,
   );
-  console.log(
-    '[tldw] captured sources',
-    job.sources.map((s) => `${s.kind} ${safePath(s.url)}`),
-  );
+  log.info('captured sources', {
+    sources: job.sources.map((s) => `${s.kind} ${safePath(s.url)}`),
+  });
 
   if (!best) {
     throw new TldwError('MEDIA_NOT_CAPTURABLE', 'No media source was captured.');
@@ -318,6 +326,7 @@ async function downloadByRanges(
   if (probe.status !== 206) {
     // Server ignored Range: this very response (200) is the full file — keep it
     // rather than re-downloading everything with a second full-GET fallback.
+    log.info('ranges unsupported → single fetch', { status: probe.status });
     assertContentLength(probe);
     diag.push('ranges unsupported → single fetch');
     return new Uint8Array(await probe.arrayBuffer());
@@ -327,12 +336,14 @@ async function downloadByRanges(
     probe.headers.get('content-range')?.match(/^bytes \d+-\d+\/(\d+)$/i)?.[1],
   );
   if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
+    log.info('ranges no total → full fetch');
     diag.push('ranges no total → full fetch');
     return null;
   }
   assertMediaSize(totalBytes);
 
   const ranges = planByteRanges(totalBytes, RANGE_BLOCK_BYTES);
+  log.info('ranges planned', { totalBytes, blocks: ranges.length });
   diag.push(`ranges total=${mb(totalBytes)}MB blocks=${ranges.length}`);
 
   // Preallocated destination: each block lands at its own offset, no giant concat.
@@ -340,6 +351,7 @@ async function downloadByRanges(
   for (const [start, end] of ranges) {
     const res = await fetchAuth(url, { Range: `bytes=${start}-${end}` });
     if (res.status !== 206) {
+      log.warn('range fetch not partial → full fetch', { status: res.status, start, end });
       diag.push(`range status=${res.status} → full fetch`);
       return null;
     }
@@ -351,6 +363,7 @@ async function downloadByRanges(
       );
     }
     out.set(block, start);
+    log.debug('range fetched', { start, end, bytes: block.byteLength });
     progress('download', t.downloading(mb(end + 1), mb(totalBytes)));
   }
   return out;

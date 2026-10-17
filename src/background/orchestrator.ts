@@ -17,6 +17,8 @@ import { getCatalog, isLocale } from '@/i18n';
 import { getSettings, saveSummary, findCachedSummary } from '@/storage';
 import { markInterrupted, sessionJobStore, snapshotOf } from './job-store';
 import type { JobStore } from './job-store';
+import { log } from './log';
+import { loggableUrl } from './loggable-url';
 
 /**
  * Job orchestration — the best-effort cascade (spec §2.1).
@@ -52,8 +54,16 @@ function commit(): void {
  */
 export async function restoreJobs(store: JobStore = sessionJobStore): Promise<void> {
   try {
-    const snapshot = markInterrupted(await store.load());
-    for (const [videoId, state] of Object.entries(snapshot.jobs)) jobs.set(videoId, state);
+    const loaded = await store.load();
+    const snapshot = markInterrupted(loaded);
+    for (const [videoId, state] of Object.entries(snapshot.jobs)) {
+      jobs.set(videoId, state);
+      // This job was still `running` in the store — markInterrupted just
+      // converted it: the previous worker died mid-job, worth a warn line.
+      if (loaded.jobs[videoId]?.phase === 'running') {
+        log.warn('job interrupted by worker restart', { videoId });
+      }
+    }
     lastJobId = snapshot.lastJobId;
   } catch {
     // Unreadable store — start from idle.
@@ -152,6 +162,12 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
   jobVideos.set(video.id, video);
   lastJobId = video.id;
   const { signal } = controller;
+  const startedAt = Date.now();
+  log.info('job started', {
+    videoId: video.id,
+    provider: video.provider,
+    url: loggableUrl(video.iframeSrc ?? video.mediaSrc),
+  });
 
   const steps = initialSteps(video.id);
   const setStep = (step: JobStep, status: JobStepStatus, detail?: string) => {
@@ -163,6 +179,7 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
     jobs.set(video.id, state);
     commit();
     broadcast(state, entry);
+    log.debug('job step', { videoId: video.id, step, status, detail });
   };
 
   jobs.set(video.id, { phase: 'running', videoId: video.id, steps });
@@ -179,6 +196,11 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
       jobs.set(video.id, done);
       commit();
       broadcast(done);
+      log.info('job done', {
+        videoId: video.id,
+        provider: video.provider,
+        durationMs: Date.now() - startedAt,
+      });
       return;
     }
 
@@ -202,9 +224,22 @@ export async function runJob(video: DetectedVideo, broadcast: Broadcaster): Prom
     jobs.set(video.id, done);
     commit();
     broadcast(done);
+    log.info('job done', {
+      videoId: video.id,
+      provider: video.provider,
+      durationMs: Date.now() - startedAt,
+    });
   } catch (err) {
     const code = err instanceof TldwError ? err.code : 'UNKNOWN';
     const detail = err instanceof TldwError ? err.providerMessage : undefined;
+    log.error('job failed', {
+      videoId: video.id,
+      provider: video.provider,
+      code,
+      providerMessage: detail,
+      stack: err instanceof Error ? err.stack : undefined,
+      durationMs: Date.now() - startedAt,
+    });
     const state: JobState = {
       phase: 'error',
       videoId: video.id,

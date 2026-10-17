@@ -1,6 +1,7 @@
 import type { DetectedVideo, Settings, Summary, SummaryContent, Transcript } from '@/types';
 import { TldwError } from '@/types';
 import { formatDuration, isoDate } from '@/shared/format';
+import { log } from '@/background/log';
 import { chat } from './openrouter';
 import { renderSummary, SCHEMA_HINT } from './template';
 
@@ -223,9 +224,19 @@ export async function summarizeYouTubeVideo(
 /** Splits text into blocks, summarizes each, returns the concatenated partials. */
 async function condense(text: string, settings: Settings, signal?: AbortSignal): Promise<string> {
   const blocks = splitIntoBlocks(text, BLOCK_CHAR_LIMIT);
+  log.info('condensing long transcript', {
+    model: settings.summaryModel,
+    blocks: blocks.length,
+    chars: text.length,
+  });
   const partials: string[] = [];
 
-  for (const block of blocks) {
+  for (const [index, block] of blocks.entries()) {
+    log.debug('openrouter condense call', {
+      model: settings.summaryModel,
+      call: index + 1,
+      total: blocks.length,
+    });
     const partial = await chat({
       apiKey: settings.openRouterKey,
       model: settings.summaryModel,

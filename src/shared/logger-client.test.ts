@@ -32,6 +32,42 @@ describe('createClientLogger', () => {
     expect(entry.data).toEqual({ apiKey: '[REDACTED]' });
   });
 
+  it('echoes the redacted entry to the matching console method when echo is on', () => {
+    const sendMessage = vi.fn(() => Promise.resolve());
+    stubChrome(sendMessage);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+    try {
+      createClientLogger('offscreen', { echo: true }).info('hello', {
+        apiKey: 'sk-or-v1-abc123',
+      });
+
+      expect(sendMessage).toHaveBeenCalledOnce();
+      expect(info).toHaveBeenCalledTimes(1);
+      expect(info.mock.calls[0]).toEqual(['[tldw:offscreen]', 'hello', { apiKey: '[REDACTED]' }]);
+      expect(debug).not.toHaveBeenCalled();
+    } finally {
+      info.mockRestore();
+      debug.mockRestore();
+    }
+  });
+
+  it('stays silent on the console when echo is off (the default)', () => {
+    const sendMessage = vi.fn(() => Promise.resolve());
+    stubChrome(sendMessage);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+    try {
+      createClientLogger('popup').info('quiet');
+
+      expect(sendMessage).toHaveBeenCalledOnce();
+      expect(info).not.toHaveBeenCalled();
+    } finally {
+      info.mockRestore();
+    }
+  });
+
   it('swallows an asynchronous sendMessage rejection', async () => {
     const sendMessage = vi.fn(() => Promise.reject(new Error('context invalidated')));
     stubChrome(sendMessage);
