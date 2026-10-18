@@ -4,9 +4,9 @@
 
 <br/>
 
-**A Manifest V3 browser extension that turns the videos on a page — YouTube, Vimeo, or any native HTML5 `<video>` — into structured Markdown summaries, even behind a login.**
+**A Manifest V3 browser extension that turns the videos on a web page into structured summaries — YouTube, Vimeo, Google Drive, embedded course players, any HTML5 `<video>` — even behind a login.**
 
-Runs entirely in your browser, with your own API keys. No backend. No subscription. No tracking.
+Runs entirely in your browser, with your own OpenRouter key. No backend. No subscription. No tracking.
 
 <br/>
 
@@ -24,195 +24,123 @@ Runs entirely in your browser, with your own API keys. No backend. No subscripti
 
 ## Table of contents
 
-- [Why](#why)
-- [Preview](#preview)
-- [Features](#features)
+- [What it does](#what-it-does)
+- [Quick start](#quick-start)
+- [Supported sites](#supported-sites)
+- [What it costs](#what-it-costs)
+- [Privacy](#privacy)
+- [Troubleshooting](#troubleshooting)
 - [How it works](#how-it-works)
-- [Install](#install)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Tech stack](#tech-stack)
-- [Project structure](#project-structure)
 - [Development](#development)
-- [Roadmap](#roadmap)
-- [Privacy &amp; legal](#privacy--legal)
+- [Documentation](#documentation)
 - [License](#license)
 
-## Why
+## What it does
 
-Educational platforms embed hours of video you don't have time to watch in full. **tldw** detects the video on the page, retrieves the spoken content — captions first, an audio-transcription fallback when there are none — and generates a **consistently structured** summary you can download as Markdown.
+Open a page with a video, click the tldw icon, press **Summarize**. tldw finds the video, gets its spoken content (captions when they exist, otherwise the audio is transcribed), and writes a **consistently structured** summary: short overview, key points, sections, glossary, takeaways.
 
-Because two summaries from two different extraction paths must read the same, the model never controls the layout: it returns structured JSON, and the Markdown is rendered locally from a **versioned template**. Same formalism, every time.
-
-## Preview
+- **One summary format, whatever the source.** The model returns structured JSON; the layout is rendered locally from a versioned template, so a summary from captions and one from audio read the same.
+- **Works behind a login.** Everything runs in your own browser session — nothing is fetched by a server on your behalf.
+- **Long videos.** A 1-hour video works: audio is processed in short windows to keep memory flat, and the progress bar shows download, transcription and summary.
+- **Pick the length after the fact.** Short / Standard / Detailed is a display choice on the result — switching is instant and free (no new model call).
+- **Export.** PDF or Word, clean-text copy, a local history of past summaries, and multi-video batches combined into one PDF.
+- **UI and summary languages** are chosen independently: English, Français, Español, Deutsch.
 
 <div align="center">
   <img src="./.github/assets/popup-v3.svg" alt="tldw popup: multi-video dashboard on the left, rendered summary with length selector and PDF/Word export on the right" width="82%" />
 </div>
 
-## Features
+## Quick start
 
-- 🎯 **Smart detection** — embedded YouTube &amp; Vimeo players, plus any native `<video>` on any site, kept up to date via a `MutationObserver`.
-- 🌍 **Any DRM-free video** — captions when available; **YouTube** falls back to Gemini watching the video URL directly; other sites (native `<video>`, course platforms) use an audio-transcription fallback. Not just the big two hosts.
-- 🌐 **Multilingual UI** — English, Français, Español, Deutsch; pick the interface *and* the summary language independently.
-- 🔐 **Works behind authentication** — extraction runs in the tab's own session context.
-- 🪜 **Best-effort cascade** — captions first, audio transcription as a fallback (`ffmpeg.wasm` + Gemini/Whisper), then an explicit typed error. Never a silent failure.
-- 📐 **Identical output every time** — structured JSON → local Markdown rendering from a versioned template.
-- 🧠 **Bring your own model** — Gemini Flash (best value) or Claude Sonnet via OpenRouter, with a hierarchical strategy for very long transcripts.
-- 💳 **One provider by default** — audio transcription runs through OpenRouter (Gemini) too, so a single API key covers everything; OpenAI Whisper stays optional.
-- 📄 **PDF &amp; Word export** — one-click, nicely formatted **PDF** or **Word (.docx)**, plus clean-text copy, a browsable local history, and multi-video batch processing into a single PDF.
-- 🎨 **Selectable templates** — `default` (full) or `compact`, chosen in Settings.
-- 🔒 **Private by design** — keys live in `chrome.storage.local` and are only ever sent to the provider they belong to.
+1. **Install** — download `tldw-vX.Y.Z.zip` from the [latest release](https://github.com/adrnbttr/tldw/releases/latest), unzip it into a folder you will keep, then in Chrome/Edge open `chrome://extensions` (or `edge://extensions`) → enable **Developer mode** → **Load unpacked** → pick that folder. Details: [`docs/INSTALL.md`](./docs/INSTALL.md). _(From source: `./install.sh`, then load `dist/`.)_
+2. **Add your OpenRouter key** — the first-run wizard asks for it ([get one](https://openrouter.ai/keys), add a few dollars of credit). It is also in **Settings**.
+3. **Click** — open a page with a video, start playback for a moment, click the tldw icon, **Summarize**. You can close the popup; the job keeps running.
+
+## Supported sites
+
+| Video | Detected as | Text comes from |
+|---|---|---|
+| **YouTube** (watch page, embed, Shorts, `lite-youtube` and similar click-to-load facades) | `youtube` | Captions. If YouTube blocks them or there are none: **Gemini watches the video URL** (see [costs](#what-it-costs)) |
+| **Vimeo** (page, `player.vimeo.com` embed) | `vimeo` | Vimeo text tracks; else audio transcription |
+| **Google Drive** (`/file/d/…/view` or `/preview`, including Drive's nested player) | `drive` | Audio transcription |
+| **Native HTML5 `<video>`** on any site, including inside open shadow DOM | `native` | Audio transcription |
+| **Hosted players in an iframe**: Wistia, Loom, Dailymotion, Brightcove, JW Player, Kaltura, Panopto, Streamable, Twitch | `native` | Audio transcription |
+
+The audio path needs a **DRM-free** stream that the page actually requests (HLS, progressive MP4 / byte ranges, Vimeo `master.json`). Not supported: DRM-encrypted media, DASH-only streams, closed shadow roots, files over **1 GiB**. tldw never tries to bypass DRM. Detection runs in every frame of the page, so cross-origin player iframes are covered; only the URL of an iframe is read, never its content from outside.
+
+## What it costs
+
+You pay OpenRouter directly, per use. Prices are the registry values in [`src/types/settings.ts`](./src/types/settings.ts) (USD per 1M tokens, input/output, verified 2026-10-18). **Everything below is an estimate** for a one-hour talk (~9,000 words ≈ 13k tokens of transcript, a summary of ~1.5k output tokens).
+
+```
+cost ≈ (input_tokens × input_price + output_tokens × output_price) / 1,000,000
+```
+
+| Path | What is billed (1 h video) | Default model, ≈ cost |
+|---|---|---|
+| **Captions** (YouTube / Vimeo with captions) | 1 summary call: ~14k in, ~1.5k out | **≈ $0.006** (`gemini-3.1-flash-lite`, $0.25 / $1.50) · ≈ $0.04 with `claude-sonnet-5.5` ($2 / $10) |
+| **Audio** (Drive, native, hosted players, Vimeo without captions) | Audio at ~32 tokens/s ≈ 115k in + ~13k out for the transcript, then the summary call above | **≈ $0.05–0.10** — audio tokens may be billed above the text rate; the audio model is `gemini-3.1-flash-lite` |
+| **YouTube, no usable captions** | Gemini ingests the video: roughly 300 tokens/s ≈ 1M tokens/h | **≈ $0.25+** for a one-hour video, which also sits near the 1,048,576-token context limit; short videos cost a fraction of this |
+| Audio via **OpenAI Whisper** (optional) | OpenAI list price ~$0.006/min | ≈ $0.36 per hour, plus the summary call |
+
+Check live prices and your usage on [openrouter.ai](https://openrouter.ai). The summary model is selectable in Settings; the audio model and the YouTube-video model are fixed to `google/gemini-3.1-flash-lite` (only Gemini models take audio/video input).
+
+## Privacy
+
+- Keys, settings and history live in `chrome.storage.local`, on your machine. A bounded, redacted activity log (`tldw.logs`) is kept there too to help debugging.
+- Transcript text, audio and (for YouTube without captions) the video URL go **only to OpenRouter** (or OpenAI if you choose Whisper), with your key. No server of ours exists; no telemetry, no analytics.
+- tldw also reads the video hosts themselves (YouTube/Vimeo caption and public oEmbed endpoints, the media files of the page) — the same requests your browser would make.
+- The diagnostic report is generated locally; you decide whether to share it.
+
+Full detail: [`docs/PRIVACY.md`](./docs/PRIVACY.md) · [privacy policy page](https://www.adrienbouttier.com/tldw/). Extracting content behind authentication may be governed by a site's terms of use; confirming your usage is permitted is your responsibility.
+
+## Troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| **“No video detected”** | Play the video for a few seconds, then click **Scan again**. If the page was open before you installed or updated tldw, reload it. |
+| **“Play the video for a few seconds…”** (`MEDIA_NEEDS_PLAYBACK`) / “stream could not be retrieved” (`MEDIA_NOT_CAPTURABLE`) | The stream is captured from the page's network traffic: reload the page, press play, wait a couple of seconds, retry. DASH-only and unusual hosts are not supported. |
+| **Key / credit / model errors** (`INVALID_API_KEY`, `INSUFFICIENT_CREDITS`, `RATE_LIMITED`, `MODEL_UNAVAILABLE`) | Check the key in **Settings**; add credits at [openrouter.ai/credits](https://openrouter.ai/credits); wait for the rate-limit countdown; pick another model. |
+| **Timeout / too large** (`TIMEOUT`, `MEDIA_TOO_LARGE`) | A stalled download fails after 2 minutes of silence; the whole job has a time budget (15 min base, plus the video's duration for transcription). Files over 1 GiB are refused. Retry on a better connection or try a shorter video. |
+| **“Interrupted”** (`INTERRUPTED`) or stuck | The browser restarted the extension's background worker; run the summary again. If it persists: **Settings → Diagnostic → Copy the report** and open an issue. |
+
+All error codes, and the diagnostic report: [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) (troubleshooting guide).
 
 ## How it works
 
-The extension tries to obtain the video's text in successive levels, dropping one rung on each failure. **Every level produces the same normalized `Transcript` object**, so the summarizer is agnostic to where the text came from — that is what guarantees a constant output formalism.
-
 ```
-  ┌──────────────────────────────────────────────────────────────┐
-  │  Level 1 — Caption track                                       │
-  │    YouTube: auto/manual captions   ·   Vimeo: text_tracks      │
-  └───────────────┬──────────────────────────────────────────────┘
-                  │ NO_CAPTIONS_AVAILABLE
-                  ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  Level 2 — Audio transcription                                 │
-  │    capture media → isolate audio (ffmpeg.wasm) → Whisper       │
-  └───────────────┬──────────────────────────────────────────────┘
-                  │ fail
-                  ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  Level 3 — Explicit, typed error (what was tried & why)        │
-  └──────────────────────────────────────────────────────────────┘
-                  │
-                  ▼ Transcript ──▶ Summarizer ──▶ template ──▶ Markdown
+content script (every frame) → service worker → offscreen document → OpenRouter
+   detects videos              jobs, queue,       download, ffmpeg.wasm,    summary,
+                               media capture      transcription chunks      audio transcription
 ```
 
-Full details in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
-
-## Install
-
-> **No account, no Web Store, no fee** — tldw installs as an unpacked extension in
-> Developer mode, for personal use. Requires [Node](https://nodejs.org) ≥ 18 and a
-> Chromium browser (Chrome / Edge / Opera).
-
-```bash
-git clone https://github.com/adrnbttr/tldw.git && cd tldw && ./install.sh
-```
-
-`install.sh` installs, builds, and prints a guided walkthrough. Then:
-
-1. Open `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick the `dist/` folder.
-2. Open the popup → **⚙️ Settings** → paste your [OpenRouter key](https://openrouter.ai/keys) → **Save**. _(Required — it powers summaries and, by default, transcription. See [Configuration](#configuration).)_
-
-<details>
-<summary>Manual build · updating · share with a colleague · troubleshooting</summary>
-
-**Manual build** — `npm install && npm run build` (output in `dist/`).
-
-**Updating** — unpacked extensions don't auto-update: `git pull && ./install.sh`,
-then click **↻ reload** on the tldw card in `chrome://extensions`.
-
-**Share with a colleague (no repo, no build on their side)** — `npm run share`
-produces `tldw-share-vX.Y.Z.zip`: a ready-to-load **`tldw-extension/`** folder plus
-a plain-language **`INSTALL.txt`**. Email it — the recipient unzips and **Load
-unpacked** the folder, then pastes their own OpenRouter key. Full steps for the
-recipient live in [`docs/INSTALL.md`](./docs/INSTALL.md). Use `npm run share:lite`
-for a ~400 KB archive (drops the 30 MB ffmpeg core — the audio fallback for
-captionless native videos — keeping YouTube/Vimeo intact). _(For a Chrome Web Store
-upload instead, `npm run package` writes a store-ready archive.)_
-
-| Symptom | Fix |
-|---|---|
-| “No video found” | Start playback, then reopen the popup — detection runs on the live page. |
-| “OpenRouter key missing” | Add your key in **⚙️ Settings**. |
-| Changes not showing after a rebuild | Click **↻ reload** on the extension card. |
-| Iterating on the code | `npm run dev` and load the `dist/` it writes — hot-reloads on save. |
-
-</details>
-
-## Configuration
-
-Open the popup → **⚙️ Settings**:
-
-| Setting | Purpose |
-|---|---|
-| **OpenRouter API key** | Summaries **and** audio transcription by default — a single provider to pay. Grab one at [openrouter.ai/keys](https://openrouter.ai/keys). |
-| **Audio transcription** | For videos without captions. Default: **OpenRouter (Gemini)** — reuses your OpenRouter key, nothing else to set up. Optionally switch to **OpenAI Whisper** (needs a separate [OpenAI key](https://platform.openai.com/api-keys)) for word-level timings. |
-| **Summary model** | `Claude Sonnet` (recommended for format fidelity) or `Gemini Flash` for very long transcripts. |
-| **Interface language** | English · Français · Español · Deutsch (applies instantly). |
-| **Summary language / length** | Language of the summary, and its length — **Short / Standard / Detailed**. Length also adapts to the video's duration (capped), so long videos stay scannable. |
-
-Keys are stored locally and never leave your browser except toward the provider they target. See [`docs/PRIVACY.md`](./docs/PRIVACY.md).
-
-## Usage
-
-1. Open a page with a video and start playback.
-2. Click the tldw icon — detected videos are listed.
-3. Hit **Résumer**. Processing continues even if you close the popup.
-4. Read the rendered summary, then **Download (.md)** or **Copy**.
-
-## Tech stack
-
-| Area | Choice |
-|---|---|
-| Platform | Manifest V3 (Chrome / Edge) |
-| Language | TypeScript (strict) |
-| UI | Preact |
-| Build | Vite + `@crxjs/vite-plugin` |
-| Audio | `ffmpeg.wasm` (single-threaded core) in an offscreen document |
-| Tests | Vitest |
-| Quality | ESLint + Prettier, GitHub Actions CI |
-| APIs | OpenRouter (summaries + audio transcription) · OpenAI Whisper (optional) |
-| Export | PDF (`jsPDF`) · Word (`docx`) |
-
-## Project structure
-
-```
-src/
-├── background/     service worker + orchestrator (the cascade)
-├── content/        DOM detection (pure helpers in detect.ts)
-├── popup/          Preact UI + components (list · processing · result · settings)
-├── adapters/       youtube.ts · vimeo.ts · registry
-├── transcription/  audio-fallback: media · chunker · whisper · ffmpeg (isolated)
-├── offscreen/      offscreen document that runs the audio pipeline
-├── summarizer/     openrouter.ts · versioned template · hierarchical summary
-├── storage/        chrome.storage wrappers
-├── shared/         format & markdown helpers
-└── types/          the shared contracts — single source of truth
-```
+Text is obtained in cascade — captions, then audio transcription (YouTube falls back to Gemini watching the URL) — and **every path produces the same `Transcript` object**, so the summarizer does not care where text came from. Full design, messages and job lifecycle: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 ## Development
 
 ```bash
-npm run dev      # Vite dev server + HMR
-npm run build    # typecheck + production build
-npm test         # unit tests (Vitest)
-npm run lint     # ESLint + Prettier check
-npm run format   # apply Prettier
+npm install
+npm run dev          # Vite dev server + HMR
+npm run build        # typecheck + production build → dist/
+npm run build:test   # build and print the path to load in Chrome
+npm test             # unit tests (Vitest)
+npm run lint         # ESLint + Prettier check
 ```
 
-To validate the extension in a real browser (phase by phase, with debugging tips),
-follow [`docs/TESTING.md`](./docs/TESTING.md), and [`docs/SCREENSHOTS.md`](./docs/SCREENSHOTS.md)
-to capture the README shots. To package and cut a release, see
-[`docs/RELEASING.md`](./docs/RELEASING.md). Contributions are welcome — see
-[`CONTRIBUTING.md`](./CONTRIBUTING.md) and the [`Code of Conduct`](./CODE_OF_CONDUCT.md).
-Security reports: [`SECURITY.md`](./SECURITY.md).
+Stack: Manifest V3, TypeScript (strict), Preact, Vite + `@crxjs/vite-plugin`, `ffmpeg.wasm` (single-threaded core, in an offscreen document), Vitest, `jsPDF` / `docx` for export.
 
-## Roadmap
+## Documentation
 
-- [x] **Phase 1** — detection, YouTube adapter, OpenRouter summary, popup, export
-- [x] **Phase 2** — Vimeo adapter (level 1: `text_tracks`)
-- [x] **Phase 3** — audio transcription fallback (`ffmpeg.wasm` + Gemini/Whisper, in an offscreen document); reconstructs Vimeo DASH audio and transcribes it. *Validated on real private, captionless Vimeo.*
-- [x] **Phase 4** — batch processing, history browser, multiple templates, quota handling
-
-Detailed roadmap in [`docs/ROADMAP.md`](./docs/ROADMAP.md).
-
-## Privacy &amp; legal
-
-Extracting content behind authentication may be governed by a site's terms of use. **Confirming that your usage is permitted is your responsibility.** tldw is built for personal use on content you legitimately have access to, and never attempts to bypass DRM — encrypted media surfaces a `MEDIA_PROTECTED` error instead.
-
-Read the [privacy policy](https://www.adrienbouttier.com/tldw/) · [`docs/PRIVACY.md`](./docs/PRIVACY.md).
+| Doc | For |
+|---|---|
+| [`docs/INSTALL.md`](./docs/INSTALL.md) | Installing, updating, uninstalling; first run |
+| [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) | Troubleshooting guide, error codes, diagnostic report |
+| [`docs/PRIVACY.md`](./docs/PRIVACY.md) | What is stored, what is sent, where |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Components, messages, job lifecycle |
+| [`docs/TESTING.md`](./docs/TESTING.md) | Validating in a real browser |
+| [`docs/RELEASING.md`](./docs/RELEASING.md) | Building, packaging, cutting a release |
+| [`docs/ROADMAP.md`](./docs/ROADMAP.md) · [`docs/SPEC.md`](./docs/SPEC.md) | What is next · original functional spec |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) · [`SECURITY.md`](./SECURITY.md) · [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) | Contributing and reporting |
 
 ## License
 

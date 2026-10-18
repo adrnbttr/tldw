@@ -30,10 +30,13 @@ describe('parseVtt', () => {
 
 describe('pickTrack', () => {
   it('prefers French over English', () => {
-    const track = pickTrack([
-      { lang: 'en', url: '/en.vtt' },
-      { lang: 'fr', url: '/fr.vtt' },
-    ]);
+    const track = pickTrack(
+      [
+        { lang: 'en', url: '/en.vtt' },
+        { lang: 'fr', url: '/fr.vtt' },
+      ],
+      ['fr'],
+    );
     expect(track.lang).toBe('fr');
   });
 });

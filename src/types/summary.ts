@@ -43,4 +43,10 @@ export interface Summary {
   content: SummaryContent;
   /** Rendered Markdown, cached so the UI and export share one source of truth. */
   markdown: string;
+  /**
+   * Built from a transcript covering only part of the video (the media was
+   * much shorter than the video): kept in history, never served from cache,
+   * and flagged in the result view.
+   */
+  partial?: boolean;
 }

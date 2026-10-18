@@ -10,6 +10,27 @@ import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+let pythonBin;
+/** First of `python3` / `python` that is a working Python 3; throws a clear error otherwise. */
+function findPython() {
+  if (pythonBin) return pythonBin;
+  for (const bin of ['python3', 'python']) {
+    try {
+      const out = execFileSync(bin, ['-c', 'import sys; print(sys.version_info[0])'], {
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+        .toString()
+        .trim();
+      if (out === '3') return (pythonBin = bin);
+    } catch {
+      // not installed / not runnable — try the next candidate
+    }
+  }
+  throw new Error(
+    'Python 3 is required to build the zip: install it (python3 or python on PATH) or use a machine that has it.',
+  );
+}
+
 /** Translate a `zip -x`-style glob ('*.map') into a RegExp ('.*\\.map'). */
 function globToRegExp(glob) {
   const source = glob.replace(/[.+^${}()|[\]\\*?]/g, (ch) =>
@@ -45,9 +66,10 @@ export function createZip(sourceDir, zipPath, { exclude = [] } = {}) {
   const src = resolve(sourceDir);
   const out = resolve(zipPath);
   const patterns = exclude.map(globToRegExp);
+  const python = findPython();
 
   if (patterns.length === 0) {
-    execFileSync('python3', ['-m', 'zipfile', '-c', out, '.'], {
+    execFileSync(python, ['-m', 'zipfile', '-c', out, '.'], {
       cwd: src,
       stdio: 'inherit',
     });
@@ -64,7 +86,7 @@ export function createZip(sourceDir, zipPath, { exclude = [] } = {}) {
       if (patterns.some((re) => re.test(file))) continue;
       copyFileSync(join(src, file), join(stage, file));
     }
-    execFileSync('python3', ['-m', 'zipfile', '-c', out, '.'], {
+    execFileSync(python, ['-m', 'zipfile', '-c', out, '.'], {
       cwd: stage,
       stdio: 'inherit',
     });

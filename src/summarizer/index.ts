@@ -1,12 +1,11 @@
 import type { DetectedVideo, Settings, Summary, SummaryContent, Transcript } from '@/types';
-import { TldwError } from '@/types';
+import { TldwError, YOUTUBE_VIDEO_MODEL, getModelInfo } from '@/types';
 import { formatDuration, isoDate } from '@/shared/format';
 import { log } from '@/background/log';
 import { chat } from './openrouter';
-import { renderSummary, SCHEMA_HINT } from './template';
+import { fallbackTitle, renderSummary, SCHEMA_HINT, KEY_POINTS_MAX } from './template';
 
-/** Model + provider that can watch a YouTube URL directly (Gemini on AI Studio). */
-const YOUTUBE_VIDEO_MODEL = 'google/gemini-2.5-flash';
+/** Provider that can watch a YouTube URL directly (Gemini on AI Studio). The model comes from the registry. */
 const YOUTUBE_PROVIDER = { order: ['google-ai-studio'] };
 
 /**
@@ -19,8 +18,70 @@ const YOUTUBE_PROVIDER = { order: ['google-ai-studio'] };
  * blocks, summarize each block, then synthesize a final summary from the partials.
  */
 
-/** Rough character budget per block before we switch to hierarchical mode. */
-const BLOCK_CHAR_LIMIT = 24_000;
+/** Condense only above this share of the model's context window. */
+const CONTEXT_SHARE = 0.5;
+/** Rough chars-per-token ratio. */
+const CHARS_PER_TOKEN = 4;
+/** Threshold for models absent from the registry. */
+const FALLBACK_CHAR_LIMIT = 60_000;
+/** Size of one block when condensing. */
+const BLOCK_CHARS = 100_000;
+/** Parallel condensation calls. */
+const CONDENSE_CONCURRENCY = 3;
+
+/**
+ * Transcript size (chars) above which map-reduce condensation is needed: at most
+ * half of the model's context (chars ≈ tokens × 4), leaving room for the prompt
+ * and the answer. Unknown model → conservative fallback.
+ */
+export function condenseThreshold(model: string): number {
+  const info = getModelInfo(model);
+  if (!info) return FALLBACK_CHAR_LIMIT;
+  return Math.floor(info.contextLength * CHARS_PER_TOKEN * CONTEXT_SHARE);
+}
+
+/** Strict JSON schema of SummaryContent (for models with structured outputs). */
+export const SUMMARY_JSON_SCHEMA = {
+  name: 'video_summary',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['tldr', 'keyPoints', 'sections', 'glossary', 'takeaways'],
+    properties: {
+      tldr: { type: 'string' },
+      keyPoints: { type: 'array', items: { type: 'string' } },
+      sections: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['heading', 'body'],
+          properties: { heading: { type: 'string' }, body: { type: 'string' } },
+        },
+      },
+      glossary: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['term', 'definition'],
+          properties: { term: { type: 'string' }, definition: { type: 'string' } },
+        },
+      },
+      takeaways: { type: 'array', items: { type: 'string' } },
+    },
+  },
+} as const;
+
+/** json_schema (strict) where the model supports it, json_object otherwise. */
+export function responseFormatFor(model: string): {
+  jsonMode: true;
+  jsonSchema?: { name: string; schema: Record<string, unknown> };
+} {
+  return getModelInfo(model)?.structuredOutputs
+    ? { jsonMode: true, jsonSchema: SUMMARY_JSON_SCHEMA }
+    : { jsonMode: true };
+}
 
 const LANGUAGE_NAMES: Record<Settings['outputLanguage'], string> = {
   en: 'English',
@@ -29,11 +90,7 @@ const LANGUAGE_NAMES: Record<Settings['outputLanguage'], string> = {
   de: 'German',
 };
 
-const DETAIL_HINT: Record<Settings['detailLevel'], string> = {
-  concise: 'Be concise: favor density, get to the essentials.',
-  standard: 'Standard level of detail.',
-  detailed: 'Be thorough: develop each section, do not drop any important point.',
-};
+const THOROUGH_HINT = 'Be thorough: develop each section, do not drop any important point.';
 
 /** Word/section budget per detail level: [min→max] scaled by duration. */
 const LENGTH_BUDGET: Record<
@@ -63,8 +120,8 @@ export function lengthDirective(
   const durNote = minutes ? `This video is about ${minutes} minutes long. ` : '';
   return (
     `${durNote}A good summary stays scannable in 1–2 minutes. Target about ${words} words total, ` +
-    `at most ${sections} thematic sections, up to 8 key points, up to 6 glossary terms, up to 5 ` +
-    `takeaways. The longer the video, the MORE you compress: merge related ideas rather than adding ` +
+    `at most ${sections} thematic sections, up to ${KEY_POINTS_MAX} key points ordered by importance ` +
+    `(most important first), up to 6 glossary terms, up to 5 takeaways. The longer the video, the MORE you compress: merge related ideas rather than adding ` +
     `sections, and never exceed these limits.`
   );
 }
@@ -78,11 +135,14 @@ export async function summarize(
     throw new TldwError('MISSING_OPENROUTER_KEY', 'OpenRouter API key is missing.');
   }
 
+  const threshold = condenseThreshold(settings.summaryModel);
   let sourceText = transcript.fullText;
+  let condensed = false;
 
   // Hierarchical pass for very long transcripts.
-  if (sourceText.length > BLOCK_CHAR_LIMIT) {
-    sourceText = await condense(sourceText, settings, signal);
+  if (sourceText.length > threshold) {
+    sourceText = await condense(sourceText, settings, Math.min(BLOCK_CHARS, threshold), signal);
+    condensed = true;
   }
 
   const languageName = LANGUAGE_NAMES[settings.outputLanguage] ?? 'English';
@@ -90,34 +150,49 @@ export async function summarize(
   // user can switch Short/Standard/Detailed instantly, with no extra model call.
   const system = [
     `You summarize educational videos. Write ALL summary content in ${languageName}.`,
-    DETAIL_HINT.detailed,
+    THOROUGH_HINT,
     lengthDirective('detailed', transcript.duration),
     SCHEMA_HINT,
   ].join('\n\n');
 
-  const user = [
-    `Title: ${transcript.metadata.title ?? 'Untitled video'}`,
-    `Transcript language: ${transcript.language}`,
-    '',
-    'Transcript:',
-    sourceText,
-  ].join('\n');
+  const buildUser = (text: string): string =>
+    [
+      `Title: ${transcript.metadata.title ?? fallbackTitle('untitled', settings.outputLanguage)}`,
+      `Transcript language: ${transcript.language}`,
+      '',
+      'Transcript:',
+      text,
+    ].join('\n');
 
-  const raw = await chat({
-    apiKey: settings.openRouterKey,
-    model: settings.summaryModel,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-    jsonMode: true,
-    signal,
-  });
+  const call = (text: string): Promise<string> =>
+    chat({
+      apiKey: settings.openRouterKey,
+      model: settings.summaryModel,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: buildUser(text) },
+      ],
+      ...responseFormatFor(settings.summaryModel),
+      signal,
+    });
+
+  let raw: string;
+  try {
+    raw = await call(sourceText);
+  } catch (err) {
+    // The estimate was too optimistic: condense with half the threshold, once.
+    if (condensed || !(err instanceof TldwError) || err.code !== 'CONTEXT_TOO_LONG') throw err;
+    log.warn('context too long, retrying with condensation', { model: settings.summaryModel });
+    const half = Math.floor(Math.min(threshold, sourceText.length) / 2);
+    raw = await call(
+      await condense(sourceText, settings, Math.min(BLOCK_CHARS, Math.max(1_000, half)), signal),
+    );
+  }
 
   const content = parseSummaryContent(raw);
 
-  const title = transcript.metadata.title ?? 'Untitled video';
-  const durationLabel = formatDuration(transcript.duration);
+  const title = transcript.metadata.title ?? fallbackTitle('untitled', settings.outputLanguage);
+  const durationLabel = formatDuration(transcript.duration, settings.outputLanguage);
   const date = isoDate();
 
   const markdown = renderSummary(
@@ -166,7 +241,7 @@ export async function summarizeYouTubeVideo(
   // Always generate the richest content; length is a render-time choice.
   const system = [
     `You summarize educational videos. Write ALL summary content in ${languageName}.`,
-    DETAIL_HINT.detailed,
+    THOROUGH_HINT,
     lengthDirective('detailed', video.duration),
     SCHEMA_HINT,
   ].join('\n\n');
@@ -186,13 +261,13 @@ export async function summarizeYouTubeVideo(
         ],
       },
     ],
-    jsonMode: true,
+    ...responseFormatFor(YOUTUBE_VIDEO_MODEL),
     signal,
   });
 
   const content = parseSummaryContent(raw);
-  const title = video.title ?? 'YouTube video';
-  const durationLabel = formatDuration(video.duration);
+  const title = video.title ?? fallbackTitle('youtube', settings.outputLanguage);
+  const durationLabel = formatDuration(video.duration, settings.outputLanguage);
   const markdown = renderSummary(
     {
       title,
@@ -221,43 +296,95 @@ export async function summarizeYouTubeVideo(
   };
 }
 
-/** Splits text into blocks, summarizes each, returns the concatenated partials. */
-async function condense(text: string, settings: Settings, signal?: AbortSignal): Promise<string> {
-  const blocks = splitIntoBlocks(text, BLOCK_CHAR_LIMIT);
+/** Splits text into blocks, summarizes them (3 in parallel), returns the partials in order. */
+async function condense(
+  text: string,
+  settings: Settings,
+  blockChars: number,
+  signal?: AbortSignal,
+): Promise<string> {
+  const blocks = splitIntoBlocks(text, blockChars);
   log.info('condensing long transcript', {
     model: settings.summaryModel,
     blocks: blocks.length,
     chars: text.length,
   });
-  const partials: string[] = [];
 
-  for (const [index, block] of blocks.entries()) {
-    log.debug('openrouter condense call', {
-      model: settings.summaryModel,
-      call: index + 1,
-      total: blocks.length,
-    });
-    const partial = await chat({
-      apiKey: settings.openRouterKey,
-      model: settings.summaryModel,
-      messages: [
-        {
-          role: 'system',
-          content: `Faithfully summarize this passage of a video in ${LANGUAGE_NAMES[settings.outputLanguage] ?? 'English'}, keeping every important point. Plain text, no formatting.`,
-        },
-        { role: 'user', content: block },
-      ],
-      signal,
-    });
-    partials.push(partial.trim());
-  }
+  const partials = await mapWithConcurrency(
+    blocks,
+    CONDENSE_CONCURRENCY,
+    async (block, index, blockSignal) => {
+      log.debug('openrouter condense call', {
+        model: settings.summaryModel,
+        call: index + 1,
+        total: blocks.length,
+      });
+      const partial = await chat({
+        apiKey: settings.openRouterKey,
+        model: settings.summaryModel,
+        messages: [
+          {
+            role: 'system',
+            content: `Faithfully summarize this passage of a video in ${LANGUAGE_NAMES[settings.outputLanguage] ?? 'English'}, keeping every important point. Plain text, no formatting.`,
+          },
+          { role: 'user', content: block },
+        ],
+        signal: blockSignal,
+      });
+      return partial.trim();
+    },
+    signal,
+  );
 
   return partials.join('\n\n');
 }
 
-/** Splits on paragraph/sentence boundaries, never mid-sentence when avoidable. */
+/**
+ * Maps with at most `limit` tasks in flight; results keep input order. The first
+ * error rejects, aborts the signal handed to in-flight tasks (they stop paying)
+ * and starts no new item. An abort of `parentSignal` is propagated too.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number, signal: AbortSignal) => Promise<R>,
+  parentSignal?: AbortSignal,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  const controller = new AbortController();
+  const onParentAbort = (): void => controller.abort();
+  if (parentSignal?.aborted) controller.abort();
+  else parentSignal?.addEventListener('abort', onParentAbort, { once: true });
+  let next = 0;
+  let failed = false;
+  const worker = async (): Promise<void> => {
+    while (!failed && !controller.signal.aborted && next < items.length) {
+      const i = next++;
+      try {
+        results[i] = await fn(items[i], i, controller.signal);
+      } catch (err) {
+        failed = true;
+        controller.abort();
+        throw err;
+      }
+    }
+  };
+  try {
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  } finally {
+    parentSignal?.removeEventListener('abort', onParentAbort);
+  }
+  if (parentSignal?.aborted) throw new TldwError('CANCELLED', 'Summary aborted.');
+  return results;
+}
+
+/**
+ * Splits on sentence boundaries, never mid-sentence when avoidable. A sentence
+ * longer than the limit (unpunctuated ASR text) is split on whitespace, and
+ * hard-split when it has none.
+ */
 export function splitIntoBlocks(text: string, limit: number): string[] {
-  const sentences = text.split(/(?<=[.!?])\s+/);
+  const sentences = text.split(/(?<=[.!?])\s+/).flatMap((s) => splitLong(s, limit));
   const blocks: string[] = [];
   let current = '';
 
@@ -272,7 +399,27 @@ export function splitIntoBlocks(text: string, limit: number): string[] {
   return blocks;
 }
 
-/** Parses the model's JSON, tolerating code fences and stray prose. */
+function splitLong(sentence: string, limit: number): string[] {
+  if (sentence.length <= limit) return [sentence];
+  const parts: string[] = [];
+  let rest = sentence;
+  while (rest.length > limit) {
+    const m = /\s\S*$/.exec(rest.slice(0, limit + 1));
+    const cut = m && m.index > 0 ? m.index : limit;
+    parts.push(rest.slice(0, cut));
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) parts.push(rest);
+  return parts;
+}
+
+/**
+ * Parses the model's JSON, tolerating code fences and stray prose — and the
+ * degenerate shapes the `json_object` fallback lets through: non-string items
+ * (numbers/booleans are stringified, objects and null skipped), blank bullets,
+ * empty sections and glossary entries are dropped. A summary with neither a
+ * TL;DR nor a key point is no summary: SUMMARY_API_ERROR (retryable).
+ */
 export function parseSummaryContent(raw: string): SummaryContent {
   const json = extractJson(raw);
   let parsed: unknown;
@@ -281,27 +428,46 @@ export function parseSummaryContent(raw: string): SummaryContent {
   } catch {
     throw new TldwError('SUMMARY_API_ERROR', 'The model did not return valid JSON.');
   }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new TldwError('SUMMARY_API_ERROR', 'The model did not return a JSON object.');
+  }
 
-  const obj = parsed as Partial<SummaryContent>;
-  return {
-    tldr: typeof obj.tldr === 'string' ? obj.tldr : '',
-    keyPoints: asStringArray(obj.keyPoints),
-    sections: Array.isArray(obj.sections)
-      ? obj.sections
-          .filter((s): s is { heading: string; body: string } => !!s && typeof s === 'object')
-          .map((s) => ({ heading: String(s.heading ?? ''), body: String(s.body ?? '') }))
-      : [],
-    glossary: Array.isArray(obj.glossary)
-      ? obj.glossary
-          .filter((g): g is { term: string; definition: string } => !!g && typeof g === 'object')
-          .map((g) => ({ term: String(g.term ?? ''), definition: String(g.definition ?? '') }))
-      : [],
-    takeaways: asStringArray(obj.takeaways),
+  const obj = parsed as Record<string, unknown>;
+  const content: SummaryContent = {
+    tldr: asText(obj.tldr),
+    keyPoints: asTextArray(obj.keyPoints),
+    sections: asObjects(obj.sections)
+      .map((s) => ({ heading: asText(s.heading), body: asText(s.body) }))
+      .filter((s) => s.heading || s.body),
+    glossary: asObjects(obj.glossary)
+      .map((g) => ({ term: asText(g.term), definition: asText(g.definition) }))
+      .filter((g) => g.term),
+    takeaways: asTextArray(obj.takeaways),
   };
+  if (!content.tldr && content.keyPoints.length === 0) {
+    throw new TldwError(
+      'SUMMARY_API_ERROR',
+      'The model returned an empty summary (no TL;DR, no key point).',
+    );
+  }
+  return content;
 }
 
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.map((v) => String(v)).filter(Boolean) : [];
+/** A trimmed string from a string, number or boolean; '' for anything else. */
+function asText(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+}
+
+function asTextArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(asText).filter(Boolean) : [];
+}
+
+function asObjects(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter((v): v is Record<string, unknown> => !!v && typeof v === 'object')
+    : [];
 }
 
 function extractJson(raw: string): string {

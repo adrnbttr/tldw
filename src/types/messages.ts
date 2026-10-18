@@ -26,9 +26,33 @@ export interface JobProgress {
   detail?: string;
 }
 
+/** Measured amounts behind a progress phase (units depend on the phase). */
+export interface ProgressData {
+  done?: number;
+  total?: number;
+  /** End boundary (seconds) of the chunk being processed, to interpolate within it. */
+  until?: number;
+  unit?: 'bytes' | 'seconds' | 'items';
+  /** Jobs waiting before this one (queued phase). */
+  ahead?: number;
+}
+
+/** Weighted, monotonic progress of a running job (see shared/job-progress.ts). */
+export interface JobPercent {
+  /** 0-100, never decreases. */
+  percent: number;
+  phase: 'queued' | 'captions' | 'download' | 'extract' | 'transcription' | 'summary' | 'done';
+  done?: number;
+  total?: number;
+  unit?: ProgressData['unit'];
+  ahead?: number;
+  /** Estimated seconds left; present only once stable. */
+  etaSeconds?: number;
+}
+
 export type JobState =
   | { phase: 'idle' }
-  | { phase: 'running'; videoId: string; steps: JobProgress[] }
+  | { phase: 'running'; videoId: string; steps: JobProgress[]; progress?: JobPercent }
   | { phase: 'done'; videoId: string; summary: Summary }
   | {
       phase: 'error';
@@ -37,72 +61,57 @@ export type JobState =
       message: string;
       /** Optional technical detail (e.g. the underlying ffmpeg/API error). */
       detail?: string;
+      /** Seconds to wait before retrying (RATE_LIMITED), when the provider said so. */
+      retryAfter?: number;
+      /** Epoch ms of the failure, set with `retryAfter`: the popup counts down from it. */
+      failedAt?: number;
     };
 
 /** popup → background */
 export type Request =
   | { type: 'LIST_VIDEOS' }
   | { type: 'RESCAN' }
-  | { type: 'GET_JOB_STATE'; videoId: string }
-  | { type: 'GET_ACTIVE_JOB' }
-  | { type: 'SUMMARIZE'; video: DetectedVideo }
+  | { type: 'GET_JOBS' }
+  /** `force`: bypass the summary cache (the user asked to regenerate). */
+  | { type: 'SUMMARIZE'; video: DetectedVideo; force?: boolean }
   | { type: 'SUMMARIZE_BATCH'; videos: DetectedVideo[] }
-  | { type: 'GET_BATCH_STATE' }
   | { type: 'CANCEL'; videoId: string }
-  | { type: 'GET_LOGS' }
   | { type: 'CLEAR_LOGS' }
   | { type: 'GET_DIAGNOSTICS' };
 
-/** The running/most-recent job with its video, for popup restore (F2). */
-export interface ActiveJob {
-  video: DetectedVideo;
+/** A job with the stable key of its video (shared/video-key.ts), for popup matching. */
+export interface KeyedJob {
+  key: string;
   state: JobState;
 }
-
-/** Outcome of one video within a batch run (F8). */
-export interface BatchItemResult {
-  videoId: string;
-  title: string;
-  ok: boolean;
-  /** Error code when `ok` is false, so the UI can localize the message. */
-  code?: TldwErrorCode;
-  message?: string;
-}
-
-export type BatchState =
-  | { phase: 'idle' }
-  | {
-      phase: 'running';
-      total: number;
-      completed: number;
-      currentTitle: string | null;
-      results: BatchItemResult[];
-    }
-  | { phase: 'done'; total: number; results: BatchItemResult[]; summaries: Summary[] };
 
 /** Response to a `Request` (via sendResponse). */
 export type Response =
   | { ok: true; videos: DetectedVideo[] }
   | { ok: true; state: JobState }
-  | { ok: true; batch: BatchState }
-  | { ok: true; active: ActiveJob | null }
-  | { ok: true; logs: LogEntry[] }
+  | { ok: true; jobs: KeyedJob[] }
   | { ok: true; report: string }
   | { ok: true }
   | { ok: false; code: TldwErrorCode; message: string };
 
 /** background → popup (broadcast, fire-and-forget). */
-export type Broadcast =
-  | { type: 'JOB_PROGRESS'; progress: JobProgress }
-  | { type: 'JOB_STATE'; state: JobState }
-  | { type: 'BATCH_STATE'; state: BatchState };
+export type Broadcast = { type: 'JOB_STATE'; state: JobState };
 
 /** offscreen/content/popup → background: one redacted log line, fire-and-forget —
  * the worker is the single writer of the central log buffer. */
 export type LogMessage = { type: 'LOG'; entry: LogEntry };
 
-/** content → background (detection results for the active tab). */
-export type ContentMessage = { type: 'VIDEOS_DETECTED'; videos: DetectedVideo[] };
+/**
+ * content → background (detection results of the sending frame). `frameKey` is
+ * the identity the frame derives from its own URL (`knownEmbedKey(location.href)`,
+ * null when it is not a known hosted player): the only identity the worker lets
+ * replace a parent's placeholder (background/frame-videos.ts).
+ */
+export type ContentMessage = {
+  type: 'VIDEOS_DETECTED';
+  videos: DetectedVideo[];
+  frameKey?: string | null;
+};
 
 /** background → content: briefly play a video (muted) to trigger media capture. */
 export type PrimeMediaMessage = { type: 'PRIME_MEDIA'; video: DetectedVideo };
@@ -111,4 +120,8 @@ export type PrimeMediaMessage = { type: 'PRIME_MEDIA'; video: DetectedVideo };
  * captions, which are only served to the youtube.com page context). */
 export type FetchTextMessage = { type: 'FETCH_TEXT'; url: string };
 
-export type ContentInbound = PrimeMediaMessage | FetchTextMessage;
+/** background → content (all frames of a tab): reset the dedup signature and
+ * publish the current list again — after a worker restart or a popup rescan. */
+export type ReportVideosMessage = { type: 'REPORT_VIDEOS' };
+
+export type ContentInbound = PrimeMediaMessage | FetchTextMessage | ReportVideosMessage;

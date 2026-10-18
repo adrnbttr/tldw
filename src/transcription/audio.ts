@@ -25,8 +25,16 @@ const AUDIO_BITRATE_KBPS = 64;
 /** Bytes per second of the extracted mono MP3, for window planning. */
 export const AUDIO_BYTES_PER_SECOND = (AUDIO_BITRATE_KBPS * 1000) / 8;
 
-/** Upper bound on the source media we accept to load (the wasm heap tops at ~2 GB). */
-export const MAX_MEDIA_BYTES = 1536 * 1024 * 1024;
+/**
+ * Upper bound on the source media we accept to load. The peak is ≈ 2× the
+ * source: the downloaded buffer is transferred to the ffmpeg worker, whose
+ * MEMFS `writeFile` stores its own copy (and assembling HLS/Vimeo parts or a
+ * streamed body briefly holds parts + result too). 1 GiB keeps that peak
+ * around 2 GiB — what one extension renderer can reliably get. Downloads
+ * check the running byte count against it and abort as soon as it is
+ * exceeded, before any concatenation.
+ */
+export const MAX_MEDIA_BYTES = 1024 * 1024 * 1024;
 
 /** Fails clean when the media would exceed the memory budget (F5 rule). */
 export function assertMediaSize(bytes: number): void {
@@ -108,20 +116,59 @@ export function parseFfmpegDuration(log: string): number | null {
 /** The single source file kept inside the ffmpeg FS. */
 const SOURCE_NAME = 'source.media';
 
+/**
+ * Bounded tail of ffmpeg's stderr, kept locally for error detail. Metadata
+ * lines (titles, GPS `location`, `com.apple.*`, encoder…) are dropped on the
+ * way in: the tail can end up in a user-pasted diagnostic.
+ */
+export class FfmpegLogTail {
+  private lines: string[] = [];
+  private inMetadata = false;
+
+  constructor(private readonly max = 12) {}
+
+  push(message: string): void {
+    if (/^\s*Metadata:\s*$/i.test(message)) {
+      this.inMetadata = true;
+      return;
+    }
+    if (this.inMetadata && /^\s{4,}\S/.test(message)) return;
+    this.inMetadata = false;
+    if (
+      /^\s*(location(-\w+)?|title|comment|artist|album|encoder|com\.apple\.[\w.-]+)\s*:/i.test(
+        message,
+      )
+    )
+      return;
+    this.lines.push(message);
+    if (this.lines.length > this.max) this.lines.shift();
+  }
+
+  recent(n: number): string {
+    return this.lines.slice(-n).join(' | ');
+  }
+}
+
 export class FfmpegAudio {
   private ffmpeg = new FFmpeg();
   private loaded = false;
   /** Last few ffmpeg log lines, surfaced on failure for diagnosis. */
-  private log: string[] = [];
+  private log = new FfmpegLogTail();
+
+  /**
+   * Local tail only, metadata filtered out (GPS location, titles…): the stream
+   * itself is never forwarded to the shared log buffer.
+   */
+  private onTailLog = ({ message }: { message: string }): void => {
+    this.log.push(message);
+  };
 
   async load(): Promise<void> {
     if (this.loaded) return;
     const base = chrome.runtime.getURL('ffmpeg');
-    this.ffmpeg.on('log', ({ message }) => {
-      this.log.push(message);
-      if (this.log.length > 12) this.log.shift();
-      log.debug('ffmpeg', message);
-    });
+    // Idempotent: a reload after terminate() must not stack a second listener.
+    this.ffmpeg.off('log', this.onTailLog);
+    this.ffmpeg.on('log', this.onTailLog);
     const started = performance.now();
     try {
       // No classWorkerURL → use the module worker Vite bundled (same-origin, CSP-ok).
@@ -139,7 +186,7 @@ export class FfmpegAudio {
 
   /** Recent ffmpeg log lines (for error diagnosis). */
   private tail(): string {
-    return this.log.slice(-4).join(' | ');
+    return this.log.recent(4);
   }
 
   /** Writes the whole media into the ffmpeg FS as a single file; returns its name. */
@@ -244,6 +291,7 @@ export class FfmpegAudio {
 
   terminate(): void {
     try {
+      this.ffmpeg.off('log', this.onTailLog);
       this.ffmpeg.terminate();
     } catch {
       // ignore

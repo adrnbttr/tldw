@@ -1,4 +1,4 @@
-import { createLogger } from '@/shared/logger';
+import { createLogger, sanitizeEntry } from '@/shared/logger';
 import { createLogStore } from './log-store';
 import type { StorageArea } from './log-store';
 
@@ -30,4 +30,9 @@ export const logStore = createLogStore(
 );
 
 /** The worker's own `sw`-stamped logger. */
-export const log = createLogger('sw', logStore.append);
+export const log = createLogger('sw', (entry) => {
+  // Same size cap and re-redaction as wire entries — one oversized or
+  // unserializable local entry must not poison the persisted buffer.
+  const clean = sanitizeEntry(entry);
+  if (clean) logStore.append(clean);
+});

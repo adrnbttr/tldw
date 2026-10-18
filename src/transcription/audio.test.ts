@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { MAX_MEDIA_BYTES, assertMediaSize, planAudioWindows, parseFfmpegDuration } from './audio';
+import {
+  MAX_MEDIA_BYTES,
+  FfmpegLogTail,
+  assertMediaSize,
+  planAudioWindows,
+  parseFfmpegDuration,
+} from './audio';
 import { TldwError } from '@/types';
 
 describe('assertMediaSize', () => {
@@ -81,5 +87,33 @@ describe('parseFfmpegDuration', () => {
   it('returns null for N/A or missing duration', () => {
     expect(parseFfmpegDuration('  Duration: N/A, start: 0.000000')).toBeNull();
     expect(parseFfmpegDuration('no duration here')).toBeNull();
+  });
+});
+
+describe('FfmpegLogTail', () => {
+  it('drops metadata blocks and sensitive keys, keeps the error lines', () => {
+    const tail = new FfmpegLogTail();
+    for (const line of [
+      'Input #0, mov,mp4, from source.media:',
+      '  Metadata:',
+      '    major_brand     : qt',
+      '    location        : +48.8584+002.2945/',
+      '    com.apple.quicktime.title: My private trip',
+      '  Duration: 00:00:10.00, start: 0.0',
+      '    title           : Secret',
+      'Error: moov atom not found',
+    ]) {
+      tail.push(line);
+    }
+    const out = tail.recent(10);
+    expect(out).not.toMatch(/location|Secret|private|major_brand|\+48/);
+    expect(out).toContain('Duration');
+    expect(out).toContain('moov atom not found');
+  });
+
+  it('stays bounded', () => {
+    const tail = new FfmpegLogTail(3);
+    for (let i = 0; i < 10; i++) tail.push(`line ${i}`);
+    expect(tail.recent(10)).toBe('line 7 | line 8 | line 9');
   });
 });

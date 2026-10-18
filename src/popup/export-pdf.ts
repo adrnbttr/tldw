@@ -1,6 +1,13 @@
 import { jsPDF } from 'jspdf';
 import type { Summary } from '@/types';
-import { templateStrings, detectSummaryLocale, lengthParts } from '@/summarizer/template';
+import {
+  templateStrings,
+  detectSummaryLocale,
+  lengthParts,
+  normalizeContent,
+  providerLabel,
+  labelled,
+} from '@/summarizer/template';
 import { isoDate, slugify } from '@/shared/format';
 
 /**
@@ -18,12 +25,18 @@ const FG: [number, number, number] = [26, 26, 26];
 
 // jsPDF standard fonts are WinAnsi; keep punctuation within that range.
 function ascii(text: string): string {
-  return text.replace(/—/g, '-').replace(/…/g, '...').replace(/·/g, '-');
+  return text
+    .replace(/\u202F/g, '\u00A0')
+    .replace(/—/g, '-')
+    .replace(/…/g, '...')
+    .replace(/·/g, '-');
 }
 
 function renderSummary(doc: jsPDF, summary: Summary): void {
-  const s = templateStrings(detectSummaryLocale(summary.markdown));
-  const c = summary.content;
+  const locale = detectSummaryLocale(summary.markdown);
+  const s = templateStrings(locale);
+  // Empty parts (degenerate model output) are skipped, headings included.
+  const c = normalizeContent(summary.content);
   const parts = lengthParts(summary.detailLevel);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -86,32 +99,42 @@ function renderSummary(doc: jsPDF, summary: Summary): void {
 
   text(summary.title, { size: 22, bold: true, color: ACCENT, gap: 6 });
   text(
-    `${s.source}: ${summary.provider}  -  ${s.duration}: ${summary.durationLabel}  -  ${s.extractedOn}: ${isoDate(new Date(summary.createdAt))}`,
+    `${labelled(s, s.source)} ${providerLabel(summary.provider, locale)}  -  ${labelled(s, s.duration)} ${summary.durationLabel}  -  ${labelled(s, s.extractedOn)} ${isoDate(new Date(summary.createdAt))}`,
     { size: 9, color: MUTED },
   );
-  text(`${s.method}: ${s.sources[summary.transcriptSource]}`, { size: 9, color: MUTED, gap: 6 });
+  text(`${labelled(s, s.method)} ${s.sources[summary.transcriptSource]}`, {
+    size: 9,
+    color: MUTED,
+    gap: 6,
+  });
 
-  heading(s.inBrief);
-  text(c.tldr.trim(), { size: 11, gap: 4 });
+  if (c.tldr) {
+    heading(s.inBrief);
+    text(c.tldr, { size: 11, gap: 4 });
+  }
 
-  heading(s.keyPoints);
-  bullets(c.keyPoints.slice(0, parts.keyPoints));
+  if (c.keyPoints.length) {
+    heading(s.keyPoints);
+    bullets(c.keyPoints.slice(0, parts.keyPoints));
+  }
 
   if (parts.sections && c.sections.length > 0) {
     heading(s.development);
     for (const section of c.sections) {
-      text(section.heading.trim(), { size: 12, bold: true, gap: 2 });
-      text(section.body.trim(), { size: 11, gap: 4 });
+      if (section.heading) text(section.heading, { size: 12, bold: true, gap: 2 });
+      if (section.body) text(section.body, { size: 11, gap: 4 });
     }
   }
 
   if (parts.glossary && c.glossary.length > 0) {
     heading(s.glossary);
-    bullets(c.glossary.map((g) => `${g.term.trim()} - ${g.definition.trim()}`));
+    bullets(c.glossary.map((g) => (g.definition ? `${g.term} - ${g.definition}` : g.term)));
   }
 
-  heading(s.toRemember);
-  bullets(c.takeaways.slice(0, parts.takeaways));
+  if (c.takeaways.length) {
+    heading(s.toRemember);
+    bullets(c.takeaways.slice(0, parts.takeaways));
+  }
 }
 
 export function buildPdf(summary: Summary): jsPDF {

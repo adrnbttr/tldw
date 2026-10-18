@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, TldwError } from '@/types';
 import type { DetectedVideo, Summary, Transcript } from '@/types';
-import { findCachedSummary, getSettings } from '@/storage';
+import { findCachedSummary, getSettings, saveSummary } from '@/storage';
 import type { Adapter } from '@/adapters';
 import { selectAdapter } from '@/adapters';
 import { summarize } from '@/summarizer';
 import { log } from './log';
 import type { JobStore, JobsSnapshot } from './job-store';
-import { restoreJobs, runJob } from './orchestrator';
+import { getJobState, getKeyedJobs, restoreJobs, runJob, runningJobIdFor } from './orchestrator';
 
 /**
  * Unit tests of the orchestrator's logging: the heavy collaborators
@@ -36,7 +36,7 @@ const video: DetectedVideo = {
   externalId: 'abc123',
   title: 'Some video',
   duration: 120,
-  iframeSrc: 'https://www.youtube.com/embed/abc123?si=SIGNED_TOKEN',
+  iframeSrc: 'https://www.youtube.com/embed/dQw4w9WgXcQ?si=SIGNED_TOKEN',
   mediaSrc: null,
   isPlaying: true,
 };
@@ -116,7 +116,7 @@ describe('orchestrator logging', () => {
     expect(typeof data.stack).toBe('string');
   });
 
-  it('logs the job start with a URL stripped to host + path', async () => {
+  it('logs the job start with a URL stripped to host + coarse path', async () => {
     await runJob(video, broadcast);
 
     expect(log.info).toHaveBeenCalledWith(
@@ -124,8 +124,8 @@ describe('orchestrator logging', () => {
       expect.objectContaining({
         videoId: video.id,
         provider: 'youtube',
-        // ?si=SIGNED_TOKEN never enters the log — host + path only.
-        url: 'www.youtube.com/embed/abc123',
+        // ?si=SIGNED_TOKEN never enters the log — host + coarse path only.
+        url: 'www.youtube.com/embed/dQw4w9WgXcQ',
       }),
     );
   });
@@ -183,5 +183,116 @@ describe('orchestrator logging', () => {
     expect(log.warn).toHaveBeenCalledWith('job interrupted by worker restart', {
       videoId: 'running-1',
     });
+  });
+});
+
+describe('orchestrator job identity', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getSettings).mockResolvedValue(DEFAULT_SETTINGS);
+    vi.mocked(findCachedSummary).mockResolvedValue(null);
+    vi.mocked(selectAdapter).mockReturnValue(adapter);
+    vi.mocked(adapter.extractCaptions).mockResolvedValue(transcript);
+  });
+
+  it('joins the running job when the same video is launched again under a new local id', async () => {
+    let finish!: (s: Summary) => void;
+    vi.mocked(summarize).mockReturnValue(new Promise<Summary>((r) => (finish = r)));
+    const first = runJob({ ...video, id: 'scan-1' }, broadcast);
+    const second = runJob({ ...video, id: 'scan-2' }, broadcast);
+    expect(runningJobIdFor({ ...video, id: 'scan-3' })).toBe('scan-1');
+    await vi.waitFor(() => expect(summarize).toHaveBeenCalled());
+    finish(summary);
+    await expect(first).resolves.toBe('scan-1');
+    await expect(second).resolves.toBe('scan-1');
+    expect(adapter.extractCaptions).toHaveBeenCalledOnce();
+    expect(getJobState('scan-2')).toEqual({ phase: 'idle' });
+    expect(getKeyedJobs()).toContainEqual({
+      key: 'youtube:abc123',
+      state: expect.objectContaining({ phase: 'done', videoId: 'scan-1' }),
+    });
+    expect(runningJobIdFor(video)).toBeNull();
+  });
+
+  it('never caches a summary whose audio source was not attributable to the video', async () => {
+    vi.mocked(summarize).mockResolvedValue(summary);
+    vi.mocked(adapter.extractCaptions).mockResolvedValue({
+      ...transcript,
+      metadata: { ...transcript.metadata, sourceAttributed: false },
+    });
+    await runJob({ ...video, id: 'unattributed' }, broadcast);
+    // Kept in history (a paid result), under a non-cacheable key only.
+    expect(saveSummary).toHaveBeenCalledTimes(1);
+    expect(saveSummary).toHaveBeenCalledWith('youtube', 'abc123', summary, expect.anything(), {
+      noCache: true,
+    });
+    expect(getJobState('unattributed')).toMatchObject({ phase: 'done' });
+    // Not a partial transcript: no partial notice.
+    expect(getJobState('unattributed')).not.toMatchObject({ summary: { partial: true } });
+  });
+
+  it('caches an attributable summary under the video key', async () => {
+    vi.mocked(summarize).mockResolvedValue(summary);
+    await runJob({ ...video, id: 'attributed' }, broadcast);
+    expect(saveSummary).toHaveBeenCalledWith(
+      'youtube',
+      'abc123',
+      summary,
+      expect.objectContaining({ outputLanguage: DEFAULT_SETTINGS.outputLanguage }),
+    );
+    expect(findCachedSummary).toHaveBeenCalledWith(
+      'youtube',
+      'abc123',
+      expect.objectContaining({ outputLanguage: DEFAULT_SETTINGS.outputLanguage }),
+    );
+    expect(adapter.extractCaptions).toHaveBeenCalledWith(expect.anything(), expect.anything(), {
+      outputLanguage: DEFAULT_SETTINGS.outputLanguage,
+    });
+  });
+
+  it('keys the cache on the selected summary model', async () => {
+    vi.mocked(summarize).mockResolvedValue(summary);
+    await runJob({ ...video, id: 'model-key' }, broadcast);
+    const ref = expect.objectContaining({ summaryModel: DEFAULT_SETTINGS.summaryModel });
+    expect(findCachedSummary).toHaveBeenCalledWith('youtube', 'abc123', ref);
+    expect(saveSummary).toHaveBeenCalledWith('youtube', 'abc123', summary, ref);
+  });
+
+  it('a forced run (regenerate) skips the cache and replaces the entry', async () => {
+    vi.mocked(findCachedSummary).mockResolvedValue({ ...summary, title: 'cached' });
+    vi.mocked(summarize).mockResolvedValue(summary);
+    await runJob({ ...video, id: 'forced' }, broadcast, { force: true });
+    expect(findCachedSummary).not.toHaveBeenCalled();
+    expect(summarize).toHaveBeenCalled();
+    expect(saveSummary).toHaveBeenCalledWith('youtube', 'abc123', summary, expect.anything());
+    expect(getJobState('forced')).toMatchObject({
+      phase: 'done',
+      summary: { title: 'Some video' },
+    });
+  });
+
+  it('propagates retryAfter and the provider detail to the error state', async () => {
+    vi.mocked(adapter.extractCaptions).mockRejectedValue(
+      new TldwError('RATE_LIMITED', 'slow down', 'provider says wait', 12),
+    );
+    await runJob({ ...video, id: 'limited' }, broadcast);
+    expect(getJobState('limited')).toMatchObject({
+      phase: 'error',
+      code: 'RATE_LIMITED',
+      detail: 'provider says wait',
+      retryAfter: 12,
+      // Absolute failure time: the popup's countdown survives a reopen.
+      failedAt: expect.any(Number),
+    });
+  });
+
+  it('attaches a monotonic progress to running states', async () => {
+    const seen: number[] = [];
+    vi.mocked(summarize).mockResolvedValue(summary);
+    await runJob({ ...video, id: 'prog' }, (state) => {
+      if (state.phase === 'running' && state.progress) seen.push(state.progress.percent);
+    });
+    expect(seen.length).toBeGreaterThan(0);
+    expect([...seen].sort((a, b) => a - b)).toEqual(seen);
   });
 });

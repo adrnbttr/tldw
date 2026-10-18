@@ -68,7 +68,7 @@ describe('assembleDiagnosticsReport', () => {
     expect(report).toContain('Version: 0.2.0');
     expect(report).toContain('Commit: d338ebe');
     expect(report).toContain(`User agent: ${USER_AGENT}`);
-    expect(report).toContain('summaryModel: google/gemini-2.5-flash');
+    expect(report).toContain('summaryModel: google/gemini-3.1-flash-lite');
     expect(report).toContain('- video-1: error (SUMMARY_API_ERROR)');
     expect(report).toContain('[sw] INFO: sw started');
     expect(report).toContain('[offscreen] ERROR: transcription failed for [REDACTED]');

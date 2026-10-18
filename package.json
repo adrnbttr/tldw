@@ -21,7 +21,11 @@
     "package": "node scripts/package.mjs",
     "release:check": "node scripts/release-check.mjs",
     "share": "node scripts/share.mjs",
-    "share:lite": "node scripts/share.mjs --lite"
+    "share:lite": "node scripts/share.mjs --lite",
+    "test:e2e": "node e2e/run.mjs --build",
+    "test:e2e:pipeline": "node e2e/pipeline.mjs --build",
+    "perf:e2e": "node e2e/perf.mjs",
+    "e2e:install": "playwright install chromium"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",
@@ -40,6 +44,7 @@
     "@typescript-eslint/eslint-plugin": "^8.13.0",
     "@typescript-eslint/parser": "^8.13.0",
     "eslint": "^8.57.1",
+    "playwright": "1.64.1",
     "prettier": "^3.3.3",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",

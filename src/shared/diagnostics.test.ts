@@ -108,7 +108,7 @@ describe('buildReport', () => {
 
   it('renders the non-secret settings values', () => {
     const out = fullReport();
-    expect(out).toContain('summaryModel: google/gemini-2.5-flash');
+    expect(out).toContain('summaryModel: google/gemini-3.1-flash-lite');
     expect(out).toContain('theme: system');
     expect(out).toContain('onboarded: false');
     expect(out).toContain('timeoutSeconds: 900');

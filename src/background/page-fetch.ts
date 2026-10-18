@@ -3,16 +3,17 @@ import { log } from './log';
 import { loggableUrl } from './loggable-url';
 
 /**
- * Fetches a URL from the active tab's content script, i.e. from the page's own
- * origin. Needed for resources gated to the page context (YouTube caption tracks
- * return empty when fetched from the service worker).
+ * Fetches a URL from a tab's content script, i.e. from the page's own origin.
+ * Needed for resources gated to the page context (YouTube caption tracks
+ * return empty when fetched from the service worker). The tab is the one the
+ * job was requested from (fixed at request time) — never "the active tab now",
+ * which may be an unrelated page by the time the job gets here. No tab → null.
  */
-export async function fetchTextViaPage(url: string): Promise<string | null> {
+export async function fetchTextViaPage(url: string, tabId?: number): Promise<string | null> {
+  if (tabId == null) return null;
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id == null) return null;
     const message: FetchTextMessage = { type: 'FETCH_TEXT', url };
-    const res = (await chrome.tabs.sendMessage(tab.id, message)) as { text?: string } | undefined;
+    const res = (await chrome.tabs.sendMessage(tabId, message)) as { text?: string } | undefined;
     const text = typeof res?.text === 'string' ? res.text : null;
     // No HTTP status crosses the wire here — the page does the fetching — so
     // the outcome is what the buffer gets (host + path, never the full URL).

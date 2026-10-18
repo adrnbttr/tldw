@@ -36,6 +36,8 @@ export interface LogStoreOptions {
   budgetBytes?: number;
   /** Consecutive failed flush attempts before the batch is dropped (default 3). */
   maxFlushAttempts?: number;
+  /** Longest an info/debug entry may wait before being persisted (default 3 s). */
+  maxWaitMs?: number;
   setTimeout?: (handler: () => void, ms: number) => number;
   clearTimeout?: (id: number) => void;
 }
@@ -64,24 +66,27 @@ function entryBytes(entry: LogEntry): number {
  * Trims a list to the serialized byte budget, evicting the oldest entries:
  * keeps the newest entries whose cumulative size fits (the JSON brackets, net
  * of one separator, seed the count), so the trimmed list serializes within
- * the budget — or empty, when even the newest entry can't fit.
+ * the budget; entries that cannot fit are skipped.
  */
 function trimToByteBudget(entries: readonly LogEntry[], budgetBytes: number): LogEntry[] {
   let acc = 1;
-  let start = entries.length;
-  while (start > 0) {
-    const size = entryBytes(entries[start - 1]);
-    if (!Number.isFinite(size) || acc + size > budgetBytes) break;
+  const kept: LogEntry[] = [];
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const size = entryBytes(entries[i]);
+    // An unfit entry (unserializable or bigger than what is left) is skipped,
+    // not a stop sign: one giant newest entry must not wipe the older ones.
+    if (!Number.isFinite(size) || acc + size > budgetBytes) continue;
     acc += size;
-    start -= 1;
+    kept.push(entries[i]);
   }
-  return entries.slice(start);
+  return kept.reverse();
 }
 
 export function createLogStore(area: StorageArea, opts: LogStoreOptions = {}): LogStore {
   const debounceMs = opts.debounceMs ?? 500;
   const capacity = opts.capacity ?? DEFAULT_LOG_CAPACITY;
   const budgetBytes = opts.budgetBytes ?? DEFAULT_LOG_BUDGET_BYTES;
+  const maxWaitMs = opts.maxWaitMs ?? 3000;
   const maxAttempts = opts.maxFlushAttempts ?? DEFAULT_MAX_FLUSH_ATTEMPTS;
   const schedule =
     opts.setTimeout ?? ((handler, ms) => globalThis.setTimeout(handler, ms) as unknown as number);
@@ -89,6 +94,7 @@ export function createLogStore(area: StorageArea, opts: LogStoreOptions = {}): L
 
   let pending: LogEntry[] = [];
   let timer: number | null = null;
+  let maxTimer: number | null = null; // fires maxWaitMs after the first pending entry
   let tail: Promise<void> = Promise.resolve();
   let attempts = 0; // consecutive failed flushes of the pending batch
 
@@ -107,14 +113,22 @@ export function createLogStore(area: StorageArea, opts: LogStoreOptions = {}): L
       cancelTimer(timer);
       timer = null;
     }
+    if (maxTimer !== null) {
+      cancelTimer(maxTimer);
+      maxTimer = null;
+    }
   };
 
-  const arm = (): void => {
-    if (timer !== null) return;
-    timer = schedule(() => {
-      timer = null;
-      void serialize(doFlush);
-    }, debounceMs);
+  const fire = (): void => {
+    cancelScheduled();
+    void serialize(doFlush);
+  };
+
+  /** (Re)starts the debounce; the max-wait timer, once running, is never restarted. */
+  const arm = (delay = debounceMs): void => {
+    if (timer !== null) cancelTimer(timer);
+    timer = schedule(fire, delay);
+    if (maxTimer === null) maxTimer = schedule(fire, Math.max(maxWaitMs, delay));
   };
 
   const readStored = async (): Promise<LogEntry[]> => {
@@ -160,7 +174,6 @@ export function createLogStore(area: StorageArea, opts: LogStoreOptions = {}): L
         void serialize(doFlush);
         return;
       }
-      cancelScheduled();
       arm();
     },
 

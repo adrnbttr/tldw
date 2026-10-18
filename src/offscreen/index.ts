@@ -1,34 +1,24 @@
 import type { TranscriptSegment } from '@/types';
 import { TldwError } from '@/types';
 import type {
-  OffscreenProgressPhase,
   OffscreenRequest,
   OffscreenResponse,
   TranscribeJob,
 } from '@/transcription/offscreen-protocol';
-import {
-  pickBestCandidate,
-  isHlsMaster,
-  isGoogleVideoUrl,
-  pickHlsVariant,
-  parseHlsMedia,
-  parseVimeoMaster,
-} from '@/transcription/media';
-import type { VimeoMaster } from '@/transcription/media';
-import {
-  FfmpegAudio,
-  AUDIO_BYTES_PER_SECOND,
-  assertMediaSize,
-  planAudioWindows,
-} from '@/transcription/audio';
+import { FfmpegAudio, AUDIO_BYTES_PER_SECOND, planAudioWindows } from '@/transcription/audio';
 import type { AudioWindow } from '@/transcription/audio';
 import { assembleChunkSegments, mergeChunkTranscripts, planChunks } from '@/transcription/chunker';
-import { planByteRanges } from '@/transcription/ranges';
+import { transcribeChunks } from '@/transcription/chunk-runner';
+import { isPartialMedia, planningDuration } from '@/transcription/coverage';
 import { transcribeAudio } from '@/transcription/whisper';
 import { transcribeViaOpenRouter } from '@/transcription/openrouter-audio';
 import { createClientLogger } from '@/shared/logger-client';
 import { getCatalog, isLocale } from '@/i18n';
 import type { Messages } from '@/i18n';
+import { downloadSource, safePath } from './download';
+import type { ProgressFn } from './download';
+import { openWorkerLink } from './worker-link';
+import { isServiceWorkerSender } from '@/background/sender-guard';
 
 /**
  * Offscreen document (F5).
@@ -37,7 +27,12 @@ import type { Messages } from '@/i18n';
  *   resolve media source → download → load into ffmpeg → extract per-window
  *   mono MP3 → transcribe → merge.
  * Transcription uses OpenRouter (Gemini) by default, or OpenAI Whisper. Progress
- * and the terminal result are posted back to the worker.
+ * and the terminal result are posted back to the worker, keyed by the run's
+ * `jobId`.
+ *
+ * One job at a time: the worker queues audio jobs, and a job holds a port to
+ * the worker for its whole duration (./worker-link.ts) — an abort as soon as
+ * the worker goes away.
  */
 
 const audio = new FfmpegAudio();
@@ -45,18 +40,70 @@ const audio = new FfmpegAudio();
 /** Offscreen logger — ships to the worker's buffer and echoes to DevTools. */
 const log = createClientLogger('offscreen', { echo: true });
 
-/**
- * Duration assumed when neither the page nor the container reports one; the
- * window loop then stops at the first empty window past the real end.
- */
-const UNKNOWN_DURATION_SECONDS = 6 * 3600;
+/** The job in flight, so a newer request (or a lost worker) can abort it. */
+let current: { jobId: string; controller: AbortController; done: Promise<void> } | null = null;
 
-chrome.runtime.onMessage.addListener((message: OffscreenRequest) => {
-  if (message.type === 'OFFSCREEN_TRANSCRIBE') {
-    void runJob(message.job);
+let swUrl: Promise<string | undefined> | null = null;
+
+/**
+ * URL of this extension's service worker script (the built manifest's entry,
+ * e.g. crxjs's `service-worker-loader.js` — what Chrome reports as the
+ * worker's `sender.url`). An offscreen document only gets a subset of
+ * `chrome.runtime` (no `getManifest`), so the manifest is read as a file of
+ * our own origin; memoized. Unreadable → undefined (the sender check then
+ * only accepts a sender without URL).
+ */
+function serviceWorkerUrl(): Promise<string | undefined> {
+  swUrl ??= fetch(chrome.runtime.getURL('manifest.json'))
+    .then((res) => res.json() as Promise<chrome.runtime.Manifest>)
+    .then((manifest) => {
+      const background = manifest.background;
+      const path = background && 'service_worker' in background ? background.service_worker : '';
+      return path ? chrome.runtime.getURL(path) : undefined;
+    })
+    .catch(() => undefined);
+  return swUrl;
+}
+
+chrome.runtime.onMessage.addListener((message: OffscreenRequest, sender) => {
+  // Only the service worker drives this document: a job carries API keys and
+  // media URLs to fetch — never accepted from a content script or a page.
+  if (message?.type === 'OFFSCREEN_TRANSCRIBE') {
+    const { job } = message;
+    void serviceWorkerUrl().then((url) => {
+      if (!isServiceWorkerSender(sender, chrome.runtime.id, url)) {
+        log.warn('offscreen request refused: not from the service worker');
+        return;
+      }
+      return startJob(job);
+    });
   }
   return false;
 });
+
+async function startJob(job: TranscribeJob): Promise<void> {
+  // The worker serializes jobs, so anything still running here is stale (its
+  // worker died or gave up on it): abort it and let it unwind first — it
+  // shares the single ffmpeg instance.
+  const previous = current;
+  if (previous) {
+    log.warn('stale offscreen job aborted', { jobId: previous.jobId });
+    previous.controller.abort();
+    await previous.done;
+  }
+
+  const controller = new AbortController();
+  const link = openWorkerLink(() => {
+    log.warn('worker link lost, aborting job', { jobId: job.jobId });
+    controller.abort();
+  });
+  const done = runJob(job, controller.signal).finally(() => {
+    link.close();
+    if (current?.jobId === job.jobId) current = null;
+  });
+  current = { jobId: job.jobId, controller, done };
+  await done;
+}
 
 function report(msg: OffscreenResponse): void {
   chrome.runtime.sendMessage(msg).catch(() => {
@@ -64,33 +111,61 @@ function report(msg: OffscreenResponse): void {
   });
 }
 
-async function runJob(job: TranscribeJob): Promise<void> {
+async function runJob(job: TranscribeJob, signal: AbortSignal): Promise<void> {
   const t = getCatalog(isLocale(job.uiLanguage) ? job.uiLanguage : 'en').transcription;
-  const progress: ProgressFn = (phase, detail, duration) =>
-    report({ type: 'OFFSCREEN_PROGRESS', videoId: job.videoId, phase, detail, duration });
+  const progress: ProgressFn = (phase, detail, duration, data) =>
+    report({ type: 'OFFSCREEN_PROGRESS', jobId: job.jobId, phase, detail, duration, data });
   const diag: string[] = [];
+  // An abort must also stop ffmpeg mid-exec: terminating the worker rejects
+  // whatever command is pending.
+  const onAbort = () => audio.terminate();
+  signal.addEventListener('abort', onAbort, { once: true });
 
   try {
-    let mediaBytes: Uint8Array | null = await downloadSource(job, t, progress, diag);
+    let mediaBytes: Uint8Array | null = await downloadSource(job, {
+      t,
+      progress,
+      diag,
+      signal,
+    });
     log.info('media downloaded', { bytes: mediaBytes.byteLength });
-    assertMediaSize(mediaBytes.byteLength);
+    throwIfAborted(signal);
 
     progress('extract', t.extractingAudio);
     const source = await audio.writeSource(mediaBytes);
-    mediaBytes = null; // the ffmpeg FS holds its own copy — release this one.
-    const duration =
-      job.duration ?? (await audio.probeDuration(source)) ?? UNKNOWN_DURATION_SECONDS;
+    mediaBytes = null; // transferred to the ffmpeg worker — drop our reference.
+    const probed = await audio.probeDuration(source);
+    const duration = planningDuration(job.duration, probed);
+    const partial = isPartialMedia(probed, job.duration);
+    if (partial) {
+      log.warn('media shorter than the video, transcript will be partial', {
+        probedSeconds: probed,
+        expectedSeconds: job.duration,
+      });
+    }
 
     const { language, segments } =
       job.transcriptionProvider === 'openrouter'
-        ? await transcribeWithOpenRouter(job, source, duration, t, progress)
-        : await transcribeWithWhisper(job, source, duration, t, progress);
+        ? await transcribeWithOpenRouter(job, source, duration, t, progress, signal)
+        : await transcribeWithWhisper(job, source, duration, t, progress, signal);
 
     await audio.removeSource();
     audio.terminate();
-    report({ type: 'OFFSCREEN_RESULT', videoId: job.videoId, ok: true, language, segments });
+    report({
+      type: 'OFFSCREEN_RESULT',
+      jobId: job.jobId,
+      ok: true,
+      language,
+      segments,
+      ...(partial ? { partial: true } : {}),
+    });
   } catch (err) {
     audio.terminate();
+    if (signal.aborted) {
+      // Nobody waits for this result any more (worker gone or job replaced).
+      log.info('offscreen job aborted', { jobId: job.jobId });
+      return;
+    }
     const code = err instanceof TldwError ? err.code : 'UNKNOWN';
     // Carry the technical detail (ffmpeg/API) + source diagnostics so the popup
     // can show exactly what the host served.
@@ -99,33 +174,32 @@ async function runJob(job: TranscribeJob): Promise<void> {
     log.error('audio fallback failed', {
       code,
       detail,
-      sources: job.sources.map((s) => `${s.kind}:${safePath(s.url)}`),
+      sourceCount: job.sources.length,
+      hosts: [...new Set(job.sources.map((s) => safePath(s.url).split('/')[0]))],
     });
-    report({ type: 'OFFSCREEN_RESULT', videoId: job.videoId, ok: false, code, message: detail });
+    const retryAfter = err instanceof TldwError ? err.retryAfter : undefined;
+    report({
+      type: 'OFFSCREEN_RESULT',
+      jobId: job.jobId,
+      ok: false,
+      code,
+      message: detail,
+      ...(retryAfter != null ? { retryAfter } : {}),
+    });
+  } finally {
+    signal.removeEventListener('abort', onAbort);
   }
 }
 
-/** Pathname only (no query/token) — safe to show for diagnostics. */
-function safePath(url: string): string {
-  try {
-    const u = new URL(url);
-    return u.host + u.pathname;
-  } catch {
-    return '?';
-  }
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw new TldwError('TIMEOUT', 'Transcription aborted.');
 }
 
 interface TranscriptResult {
-  language: string;
+  /** Detected spoken language, when the provider reports one. */
+  language?: string;
   segments: TranscriptSegment[];
 }
-
-/**
- * Progress callback threaded through the pipeline: coarse phase (so the worker
- * can time each phase), localized detail, plus the resolved media duration once
- * extraction has probed it.
- */
-type ProgressFn = (phase: OffscreenProgressPhase, detail: string, duration?: number) => void;
 
 /** OpenRouter (Gemini) path: plain-text transcript, no overlap, one segment/chunk. */
 async function transcribeWithOpenRouter(
@@ -134,6 +208,7 @@ async function transcribeWithOpenRouter(
   duration: number,
   t: Messages['transcription'],
   progress: ProgressFn,
+  signal: AbortSignal,
 ): Promise<TranscriptResult> {
   const chunks = planChunks({
     durationSeconds: duration,
@@ -143,25 +218,31 @@ async function transcribeWithOpenRouter(
 
   // Index-addressed texts: chunk completion order (even concurrent) cannot
   // reorder the transcript.
-  const texts: Array<string | undefined> = [];
-  for (const chunk of chunks) {
-    progress(
-      'transcribe',
-      chunks.length === 1
-        ? t.transcribingOne
-        : t.transcribing(chunk.index + 1, chunks.length, formatClock(chunk.start)),
-      duration,
-    );
-    const mp3 = await extractAudioWindow(source, chunk);
-    if (!mp3) break;
-    texts[chunk.index] = await transcribeViaOpenRouter(mp3, {
-      apiKey: job.openRouterKey,
-      model: job.audioModel,
-      language: job.language,
-    });
-  }
+  const texts = await transcribeChunks(chunks, {
+    onChunk: (chunk, total) =>
+      progress(
+        'transcribe',
+        total === 1
+          ? t.transcribingOne
+          : t.transcribing(chunk.index + 1, total, formatClock(chunk.start)),
+        duration,
+        { done: chunk.start, total: duration, until: chunk.end, unit: 'seconds' },
+      ),
+    extract: (start, end) => {
+      throwIfAborted(signal);
+      return audio.extractWindow(source, start, end);
+    },
+    transcribe: (mp3) =>
+      transcribeViaOpenRouter(mp3, {
+        apiKey: job.openRouterKey,
+        model: job.audioModel,
+        signal,
+      }),
+    log,
+  });
 
-  return { language: job.language, segments: assembleChunkSegments(chunks, texts) };
+  // Gemini returns plain text: no detected language to report.
+  return { segments: assembleChunkSegments(chunks, texts) };
 }
 
 /** OpenAI Whisper path: per-segment timings, overlap, reassembled + de-duplicated. */
@@ -171,6 +252,7 @@ async function transcribeWithWhisper(
   duration: number,
   t: Messages['transcription'],
   progress: ProgressFn,
+  signal: AbortSignal,
 ): Promise<TranscriptResult> {
   const windows = planAudioWindows({
     durationSeconds: duration,
@@ -179,7 +261,7 @@ async function transcribeWithWhisper(
 
   const perWindowSegments: TranscriptSegment[][] = [];
   const offsets: number[] = [];
-  let language = job.language;
+  let language: string | undefined;
 
   for (const window of windows) {
     progress(
@@ -188,16 +270,19 @@ async function transcribeWithWhisper(
         ? t.transcribingOne
         : t.transcribing(window.index + 1, windows.length, formatClock(window.start)),
       duration,
+      { done: window.start, total: duration, until: window.end, unit: 'seconds' },
     );
+    throwIfAborted(signal);
     const mp3 = await extractAudioWindow(source, window);
     if (!mp3) break;
+    // No language forced: Whisper detects the spoken one and reports it.
     const result = await transcribeAudio(
       new Blob([mp3 as BlobPart]),
       `window-${window.index}.mp3`,
       {
         apiKey: job.transcriptionKey,
         model: job.whisperModel,
-        language: job.language,
+        signal,
       },
     );
     language = result.language || language;
@@ -219,228 +304,6 @@ async function extractAudioWindow(source: string, window: AudioWindow): Promise<
     throw new TldwError('AUDIO_EXTRACTION_FAILED', 'The input has no decodable audio track.');
   }
   return mp3;
-}
-
-/** Resolves and downloads the best media source into a single byte buffer. */
-async function downloadSource(
-  job: TranscribeJob,
-  t: Messages['transcription'],
-  progress: ProgressFn,
-  diag: string[],
-): Promise<Uint8Array> {
-  const best = pickBestCandidate(job.sources);
-
-  // Compact diagnostics (most useful first, so it survives truncation).
-  const counts: Record<string, number> = {};
-  for (const s of job.sources) counts[s.kind] = (counts[s.kind] ?? 0) + 1;
-  const sample = job.sources.find((s) => s.kind !== 'segment') ?? job.sources[0];
-  if (sample) diag.push(`sample=${sample.kind}:${safePath(sample.url)}`);
-  diag.push(
-    `kinds=${
-      Object.entries(counts)
-        .map(([k, n]) => `${k}×${n}`)
-        .join(',') || 'none'
-    }`,
-  );
-  log.info('captured sources', {
-    sources: job.sources.map((s) => `${s.kind} ${safePath(s.url)}`),
-  });
-
-  if (!best) {
-    throw new TldwError('MEDIA_NOT_CAPTURABLE', 'No media source was captured.');
-  }
-
-  progress('download', t.fetchingMedia);
-
-  if (best.kind === 'vimeo_master') {
-    return downloadVimeoMaster(best.url, t, progress, diag);
-  }
-
-  if (best.kind === 'progressive' || best.kind === 'segment') {
-    // Google Drive: googlevideo serves one whole file as byte ranges; fetch it
-    // block by block (resumable, visible progress) instead of a single request.
-    if (best.kind === 'progressive' && isGoogleVideoUrl(best.url)) {
-      const ranged = await downloadByRanges(best.url, t, progress, diag);
-      if (ranged) return ranged;
-      // Range support broke mid-way — fall back to the single full GET.
-    }
-    return fetchBytes(best.url);
-  }
-
-  if (best.kind === 'hls') {
-    let url = best.url;
-    let playlist = await (await fetchAuth(url)).text();
-
-    // Master playlist → resolve to a media playlist (audio-only if available).
-    if (isHlsMaster(playlist)) {
-      const variant = pickHlsVariant(playlist, url);
-      diag.push(`master→variant=${variant ? safePath(variant) : 'none'}`);
-      if (!variant) {
-        throw new TldwError('MEDIA_NOT_CAPTURABLE', 'No usable variant in HLS master.');
-      }
-      url = variant;
-      playlist = await (await fetchAuth(url)).text();
-    }
-
-    const { initUrl, segmentUrls } = parseHlsMedia(playlist, url);
-    diag.push(`hls map=${initUrl ? 'yes' : 'no'} segs=${segmentUrls.length}`);
-    if (segmentUrls.length === 0) {
-      throw new TldwError('MEDIA_NOT_CAPTURABLE', 'HLS playlist had no segments.');
-    }
-
-    const parts: Uint8Array[] = [];
-    // The fMP4 init segment MUST come first, or the fragments are undecodable.
-    if (initUrl) parts.push(await fetchBytes(initUrl));
-    for (let i = 0; i < segmentUrls.length; i++) {
-      progress('download', t.assembling(i + 1, segmentUrls.length));
-      parts.push(await fetchBytes(segmentUrls[i]));
-    }
-    return concat(parts);
-  }
-
-  // DASH and anything else are not assembled here.
-  throw new TldwError('MEDIA_NOT_CAPTURABLE', `Unsupported media kind: ${best.kind}.`);
-}
-
-/** Block size for googlevideo range downloads (8–16 MiB sweet spot). */
-const RANGE_BLOCK_BYTES = 8 * 1024 * 1024;
-
-/**
- * Downloads a googlevideo source in fixed byte ranges (`Range: bytes=a-b`),
- * concatenating the blocks and reporting progress, so a large file arrives in
- * resumable chunks instead of one giant request. If the probe shows the server
- * ignores ranges (200 instead of 206), the response body already IS the whole
- * file and is returned as-is. Returns null only when range support looked fine
- * but broke (no usable Content-Range, or a non-206 block mid-download) — the
- * caller then falls back to a single full GET.
- */
-async function downloadByRanges(
-  url: string,
-  t: Messages['transcription'],
-  progress: ProgressFn,
-  diag: string[],
-): Promise<Uint8Array | null> {
-  // Probe with a 1-byte range: 206 + `Content-Range: bytes 0-0/TOTAL` proves
-  // range support and reveals the total size.
-  const probe = await fetchAuth(url, { Range: 'bytes=0-0' });
-  if (probe.status !== 206) {
-    // Server ignored Range: this very response (200) is the full file — keep it
-    // rather than re-downloading everything with a second full-GET fallback.
-    log.info('ranges unsupported → single fetch', { status: probe.status });
-    assertContentLength(probe);
-    diag.push('ranges unsupported → single fetch');
-    return new Uint8Array(await probe.arrayBuffer());
-  }
-  await probe.arrayBuffer(); // 1-byte probe body — release the connection.
-  const totalBytes = Number(
-    probe.headers.get('content-range')?.match(/^bytes \d+-\d+\/(\d+)$/i)?.[1],
-  );
-  if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
-    log.info('ranges no total → full fetch');
-    diag.push('ranges no total → full fetch');
-    return null;
-  }
-  assertMediaSize(totalBytes);
-
-  const ranges = planByteRanges(totalBytes, RANGE_BLOCK_BYTES);
-  log.info('ranges planned', { totalBytes, blocks: ranges.length });
-  diag.push(`ranges total=${mb(totalBytes)}MB blocks=${ranges.length}`);
-
-  // Preallocated destination: each block lands at its own offset, no giant concat.
-  const out = new Uint8Array(totalBytes);
-  for (const [start, end] of ranges) {
-    const res = await fetchAuth(url, { Range: `bytes=${start}-${end}` });
-    if (res.status !== 206) {
-      log.warn('range fetch not partial → full fetch', { status: res.status, start, end });
-      diag.push(`range status=${res.status} → full fetch`);
-      return null;
-    }
-    const block = new Uint8Array(await res.arrayBuffer());
-    if (block.byteLength !== end - start + 1) {
-      throw new TldwError(
-        'MEDIA_NOT_CAPTURABLE',
-        `Range ${start}-${end} returned ${block.byteLength} bytes.`,
-      );
-    }
-    out.set(block, start);
-    log.debug('range fetched', { start, end, bytes: block.byteLength });
-    progress('download', t.downloading(mb(end + 1), mb(totalBytes)));
-  }
-  return out;
-}
-
-/** Rounds a byte count to MiB with one decimal (progress labels, diagnostics). */
-function mb(bytes: number): number {
-  return Math.round((bytes / (1024 * 1024)) * 10) / 10;
-}
-
-/** Reconstructs a playable fMP4 from a Vimeo DASH master.json (init + segments). */
-async function downloadVimeoMaster(
-  masterUrl: string,
-  t: Messages['transcription'],
-  progress: ProgressFn,
-  diag: string[],
-): Promise<Uint8Array> {
-  // Force base64_init so the init segment is inlined in the manifest.
-  const url = /base64_init=1/.test(masterUrl)
-    ? masterUrl
-    : masterUrl + (masterUrl.includes('?') ? '&' : '?') + 'base64_init=1';
-
-  const master = (await (await fetchAuth(url)).json()) as VimeoMaster;
-  const { initBase64, segmentUrls } = parseVimeoMaster(master, url);
-  diag.push(`vimeo-master init=${initBase64 ? 'yes' : 'no'} segs=${segmentUrls.length}`);
-
-  if (!initBase64 || segmentUrls.length === 0) {
-    throw new TldwError('MEDIA_NOT_CAPTURABLE', 'master.json had no init/segments.');
-  }
-
-  const parts: Uint8Array[] = [base64ToBytes(initBase64)];
-  for (let i = 0; i < segmentUrls.length; i++) {
-    progress('download', t.assembling(i + 1, segmentUrls.length));
-    parts.push(await fetchBytes(segmentUrls[i]));
-  }
-  return concat(parts);
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-async function fetchAuth(url: string, headers?: Record<string, string>): Promise<Response> {
-  const res = await fetch(url, { credentials: 'include', headers });
-  if (!res.ok) {
-    if (res.status === 403 || res.status === 401) {
-      throw new TldwError('MEDIA_PROTECTED', `Media request returned ${res.status}.`);
-    }
-    throw new TldwError('MEDIA_NOT_CAPTURABLE', `Media request returned ${res.status}.`);
-  }
-  return res;
-}
-
-/** Fails clean when the response announces a body over the memory limit. */
-function assertContentLength(res: Response): void {
-  const len = Number(res.headers.get('content-length'));
-  if (Number.isFinite(len) && len > 0) assertMediaSize(len);
-}
-
-async function fetchBytes(url: string): Promise<Uint8Array> {
-  const res = await fetchAuth(url);
-  assertContentLength(res);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-function concat(parts: Uint8Array[]): Uint8Array {
-  const total = parts.reduce((n, p) => n + p.byteLength, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const p of parts) {
-    out.set(p, offset);
-    offset += p.byteLength;
-  }
-  return out;
 }
 
 function formatClock(seconds: number): string {

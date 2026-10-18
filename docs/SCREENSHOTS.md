@@ -4,7 +4,8 @@ How to capture the screenshots used in the README and (later) the Chrome Web Sto
 listing, so they look consistent and clean.
 
 Save PNGs to `.github/assets/screenshots/` with the filenames in the table below,
-then reference them from the [Preview](../README.md#preview) section.
+then reference them from the README (the illustration at the end of
+[What it does](../README.md#what-it-does)).
 
 ## What to capture
 
@@ -35,12 +36,12 @@ reliable ways:
 
 ## Consistency checklist
 
-- Use the **same theme** (light or dark) across all shots — the popup follows your
-  OS setting; pick one and stick to it.
+- Use the **same theme** (light or dark) across all shots — set it in Settings → Theme (default: follows
+  your OS); pick one and stick to it.
 - Use a **real, non-sensitive** video (a public YouTube embed is ideal).
 - **Never show real API keys.** In Settings, type a placeholder like
   `sk-or-xxxxxxxx` before capturing, or blur it afterwards.
-- Keep the popup at its natural width (380 px) — don't stretch it.
+- Keep the popup at its natural width (460 px) — don't stretch it.
 - Trim OS chrome (window shadows are fine; desktop clutter is not).
 
 ## Optimizing the files
@@ -56,7 +57,7 @@ Aim for < 200 KB per image. A width of ~760 px (the popup at 2× DPR) is plenty.
 
 ## Wiring them into the README
 
-The README currently uses an SVG mock in the Preview section. Once you have real
+The README currently uses an SVG mock under “What it does”. Once you have real
 shots, swap it for a small gallery, e.g.:
 
 ```html
@@ -67,5 +68,5 @@ shots, swap it for a small gallery, e.g.:
 </p>
 ```
 
-Keep the SVG mock (`.github/assets/popup-mockup.svg`) as a fallback — it renders on
+Keep the SVG mock (`.github/assets/popup-v3.svg`) as a fallback — it renders on
 any renderer that blocks external images.

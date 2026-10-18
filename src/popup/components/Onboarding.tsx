@@ -5,6 +5,7 @@ import { SUPPORTED_LOCALES, LOCALE_LABELS, isLocale } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { saveSettings } from '@/storage';
 import { applyTheme } from '../theme';
+import { KeyInput } from './KeyInput';
 
 interface Props {
   /** Initial values (browser-detected languages, default theme). */
@@ -23,6 +24,7 @@ export function Onboarding({ initial, onLocaleChange, onFinish }: Props) {
   const [outputLanguage, setOutputLanguage] = useState<Locale>(initial.outputLanguage);
   const [theme, setTheme] = useState<Theme>(initial.theme);
   const [key, setKey] = useState('');
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const pickUi = (loc: Locale) => {
     setUiLanguage(loc);
@@ -34,13 +36,20 @@ export function Onboarding({ initial, onLocaleChange, onFinish }: Props) {
   };
 
   const finish = async () => {
-    await saveSettings({
-      uiLanguage,
-      outputLanguage,
-      theme,
-      onboarded: true,
-      ...(key.trim() ? { openRouterKey: key.trim() } : {}),
-    });
+    try {
+      await saveSettings({
+        uiLanguage,
+        outputLanguage,
+        theme,
+        onboarded: true,
+        ...(key.trim() ? { openRouterKey: key.trim() } : {}),
+      });
+    } catch {
+      // Storage refused the write: stay on the wizard rather than lose the choices.
+      setSaveFailed(true);
+      setTimeout(() => setSaveFailed(false), 1500);
+      return;
+    }
     onFinish();
   };
 
@@ -102,6 +111,7 @@ export function Onboarding({ initial, onLocaleChange, onFinish }: Props) {
                 <button
                   key={th}
                   class={`theme-card ${theme === th ? 'active' : ''} theme-${th}`}
+                  aria-pressed={theme === th}
                   onClick={() => pickTheme(th)}
                 >
                   <span class="theme-swatch" />
@@ -122,13 +132,22 @@ export function Onboarding({ initial, onLocaleChange, onFinish }: Props) {
             >
               {t.onboarding.keyGet}
             </a>
-            <input
-              type="password"
+            {/* Enter in the field moves on, like the "Next" button. */}
+            <form
               class="onb-key"
-              value={key}
-              placeholder={t.onboarding.keyPlaceholder}
-              onInput={(e) => setKey((e.target as HTMLInputElement).value)}
-            />
+              onSubmit={(e) => {
+                e.preventDefault();
+                next();
+              }}
+            >
+              <KeyInput
+                value={key}
+                onInput={setKey}
+                placeholder={t.onboarding.keyPlaceholder}
+                ariaLabel={t.settings.openRouterKey}
+                openRouter
+              />
+            </form>
             <p class="onb-note">{t.onboarding.keyCost}</p>
             <p class="onb-note">{t.onboarding.keyLater}</p>
           </Step>
@@ -139,7 +158,7 @@ export function Onboarding({ initial, onLocaleChange, onFinish }: Props) {
         )}
       </div>
 
-      <div class="onb-dots">
+      <div class="onb-dots" aria-hidden="true">
         {Array.from({ length: STEPS }, (_, i) => (
           <span key={i} class={`dot ${i === step ? 'on' : ''}`} />
         ))}
@@ -159,7 +178,7 @@ export function Onboarding({ initial, onLocaleChange, onFinish }: Props) {
           </button>
         ) : step === STEPS - 1 ? (
           <button class="primary" onClick={() => void finish()}>
-            {t.onboarding.finish}
+            {saveFailed ? t.result.failed : t.onboarding.finish}
           </button>
         ) : (
           <button class="primary" onClick={next}>
@@ -179,7 +198,9 @@ function Step(props: {
 }) {
   return (
     <div class="onb-step">
-      <div class="onb-icon">{props.icon}</div>
+      <div class="onb-icon" aria-hidden="true">
+        {props.icon}
+      </div>
       <h2 class="onb-title">{props.title}</h2>
       <p class="onb-text">{props.body}</p>
       {props.children}

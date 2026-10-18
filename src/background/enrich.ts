@@ -74,10 +74,12 @@ async function metaFor(video: DetectedVideo): Promise<Meta> {
 export async function enrichVideos(videos: DetectedVideo[]): Promise<DetectedVideo[]> {
   return Promise.all(
     videos.map(async (video) => {
+      // YouTube's oEmbed has no duration: with the title known, its fetch
+      // (awaited before the popup's list renders) could only be discarded.
       const needsMeta =
-        (video.provider === 'vimeo' || video.provider === 'youtube') &&
         !!video.externalId &&
-        (video.duration == null || video.title == null);
+        ((video.provider === 'vimeo' && (video.duration == null || video.title == null)) ||
+          (video.provider === 'youtube' && video.title == null));
       if (!needsMeta) return video;
 
       const meta = await metaFor(video);

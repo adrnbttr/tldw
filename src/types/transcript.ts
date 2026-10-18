@@ -33,6 +33,18 @@ export interface Transcript {
     provider: Provider;
     /** ISO-8601 timestamp of extraction. */
     extractedAt: string;
+    /**
+     * `false` when the audio came from tab-wide captures that could not be tied
+     * to this video (several players captured, none in its frame): the summary
+     * is shown but never cached under the video's id. Absent = attributed.
+     */
+    sourceAttributed?: boolean;
+    /**
+     * `true` when the transcribed media covers clearly less than the video's
+     * expected duration (e.g. only a few captured segments): the summary is
+     * shown but never cached. Absent = complete as far as we can tell.
+     */
+    partial?: boolean;
   };
 }
 

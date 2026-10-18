@@ -1,5 +1,6 @@
 import { TldwError } from '@/types';
 import { log } from '@/background/log';
+import { classifyHttpError, isResponseFormatError } from '@/shared/http-error';
 
 /**
  * Minimal OpenRouter chat client (F7).
@@ -27,14 +28,53 @@ export interface ChatOptions {
   messages: ChatMessage[];
   /** Ask the provider to return a JSON object when the model supports it. */
   jsonMode?: boolean;
+  /** Strict JSON schema output (takes precedence over jsonMode). */
+  jsonSchema?: { name: string; schema: Record<string, unknown> };
   temperature?: number;
   /** OpenRouter provider routing (e.g. force Google AI Studio for YouTube URLs). */
   provider?: Record<string, unknown>;
   signal?: AbortSignal;
 }
 
+/** Models whose provider rejected strict json_schema: use json_object from now on. */
+const schemaRejected = new Set<string>();
+
+/** Test hook: forget the models remembered as rejecting json_schema. */
+export function resetSchemaFallback(): void {
+  schemaRejected.clear();
+}
+
+/** A 400 caused by the response_format: carries the error to throw if the retry is not possible. */
+class SchemaRejectedError extends TldwError {}
+
 export async function chat(options: ChatOptions): Promise<string> {
-  const { apiKey, model, messages, jsonMode, temperature = 0.3, provider, signal } = options;
+  const { jsonSchema, model } = options;
+  if (jsonSchema && schemaRejected.has(model)) {
+    return chatOnce({ ...options, jsonSchema: undefined, jsonMode: true });
+  }
+  try {
+    return await chatOnce(options);
+  } catch (err) {
+    if (jsonSchema && err instanceof SchemaRejectedError) {
+      schemaRejected.add(model);
+      log.warn('json_schema rejected, retrying with json_object', { model });
+      return chatOnce({ ...options, jsonSchema: undefined, jsonMode: true });
+    }
+    throw err;
+  }
+}
+
+async function chatOnce(options: ChatOptions): Promise<string> {
+  const {
+    apiKey,
+    model,
+    messages,
+    jsonMode,
+    jsonSchema,
+    temperature = 0.3,
+    provider,
+    signal,
+  } = options;
 
   if (!apiKey) {
     throw new TldwError('MISSING_OPENROUTER_KEY', 'OpenRouter API key is missing.');
@@ -56,27 +96,39 @@ export async function chat(options: ChatOptions): Promise<string> {
         messages,
         temperature,
         ...(provider ? { provider } : {}),
-        ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+        ...(jsonSchema
+          ? {
+              response_format: {
+                type: 'json_schema',
+                json_schema: { name: jsonSchema.name, strict: true, schema: jsonSchema.schema },
+              },
+            }
+          : jsonMode
+            ? { response_format: { type: 'json_object' } }
+            : {}),
       }),
       signal,
     });
   } catch (err) {
-    if (signal?.aborted) throw new TldwError('TIMEOUT', 'Summary request aborted.');
+    if (signal?.aborted) throw new TldwError('CANCELLED', 'Summary request aborted.');
     log.warn('openrouter request failed', { model, error: String(err) });
     throw new TldwError('SUMMARY_API_ERROR', 'Network error calling OpenRouter.', String(err));
   }
 
-  if (response.status === 429 || response.status === 402) {
-    const body = await safeText(response);
-    const retry = response.headers.get('retry-after');
-    const hint = retry ? `réessayez dans ${retry}s. ${body}` : body;
-    log.warn('openrouter quota exceeded', { model, status: response.status, retryAfter: retry });
-    throw new TldwError('QUOTA_EXCEEDED', 'OpenRouter quota/credits exceeded.', hint.trim());
-  }
   if (!response.ok) {
     const body = await safeText(response);
-    log.warn('openrouter api error', { model, status: response.status });
-    throw new TldwError('SUMMARY_API_ERROR', `OpenRouter returned ${response.status}.`, body);
+    const retryAfter = parseRetryAfter(response.headers.get('retry-after'));
+    const code = classifyHttpError(response.status, body);
+    if (response.status === 400 && jsonSchema && isResponseFormatError(body)) {
+      throw new SchemaRejectedError(code, `OpenRouter returned 400.`, body.trim() || undefined);
+    }
+    log.warn('openrouter api error', { model, status: response.status, code, retryAfter });
+    throw new TldwError(
+      code,
+      `OpenRouter returned ${response.status}.`,
+      body.trim() || undefined,
+      retryAfter,
+    );
   }
 
   const data = (await response.json()) as {
@@ -101,4 +153,16 @@ async function safeText(response: globalThis.Response): Promise<string> {
   } catch {
     return '';
   }
+}
+
+/** Maps an OpenRouter HTTP failure to an actionable error code (shared with the audio clients). */
+export { classifyHttpError };
+
+/** Retry-After in seconds (numeric form, or an HTTP date); undefined if absent/invalid. */
+export function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const n = Number(value);
+  if (Number.isFinite(n) && n >= 0) return Math.ceil(n);
+  const date = Date.parse(value);
+  return Number.isNaN(date) ? undefined : Math.max(0, Math.ceil((date - Date.now()) / 1000));
 }

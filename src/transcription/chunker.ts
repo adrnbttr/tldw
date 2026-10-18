@@ -61,8 +61,26 @@ export function planChunks(options: ChunkOptions): ChunkPlan[] {
     start = end - overlapSeconds;
     index++;
   }
+
+  // A sliver of a last chunk (3601 s → 1 s tail) costs a full request and
+  // often comes back empty: fold it into the previous chunk. The merged chunk
+  // exceeds `cap` by at most the tail threshold (30 s, or 10 % of `cap` when
+  // chunks are short) and never exceeds `maxBytes`.
+  const last = plans[plans.length - 1];
+  const prev = plans[plans.length - 2];
+  if (last && prev) {
+    const tailThreshold = Math.min(TAIL_MERGE_SECONDS, cap * 0.1);
+    const mergedBytes = (last.end - prev.start) * bytesPerSecond;
+    if (last.end - last.start < tailThreshold && mergedBytes <= maxBytes) {
+      plans.pop();
+      prev.end = last.end;
+    }
+  }
   return plans;
 }
+
+/** A final chunk shorter than this (seconds) is merged into the previous one. */
+const TAIL_MERGE_SECONDS = 30;
 
 /**
  * Reassembles per-chunk segment lists into one ordered, de-duplicated list.

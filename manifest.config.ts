@@ -14,6 +14,14 @@ import pkg from './package.json';
  * any authenticated site the user legitimately visits. All network calls stay in
  * the browser; no data is sent anywhere except the user's own API providers.
  */
+/**
+ * `match_origin_as_fallback` (Chrome ≥ 99) also injects into frames whose URL
+ * has no matchable origin — sandboxed srcdoc, blob:, data: frames — matched by
+ * their creator's origin, where `match_about_blank` alone does not reach (opaque
+ * origins). Spread in: crxjs's manifest type does not know the key yet.
+ */
+const ORIGIN_FALLBACK = { match_origin_as_fallback: true } as Record<string, unknown>;
+
 export default defineManifest({
   manifest_version: 3,
   name: 'tldw — Video Summaries',
@@ -38,24 +46,31 @@ export default defineManifest({
     service_worker: 'src/background/index.ts',
     type: 'module',
   },
+  // A single entry: crxjs keys content scripts by file, so two entries on the same
+  // file overwrite each other's web_accessible_resources (and break the loader on
+  // every site but the last entry's). Runs in every frame — including about:blank /
+  // srcdoc ones — so videos inside cross-origin player iframes (Drive, Wistia,
+  // Loom, Brightcove, LMS embeds…) can be detected and driven. Sub-frames publish
+  // their own list (keyed by frame in the worker); see src/content/index.ts.
   content_scripts: [
     {
+      ...ORIGIN_FALLBACK,
       matches: ['<all_urls>'],
-      js: ['src/content/index.ts'],
-      run_at: 'document_idle',
-      all_frames: false,
-    },
-    // Drive's player is nested cross-origin (host page → drive.google.com →
-    // youtube.googleapis.com): run there too so the player's <video> is reachable
-    // (PRIME_MEDIA can drive it). Targeted at Drive's hosts only, so irrelevant
-    // iframes never run the script; sub-frames never publish detections (see
-    // `isSubframe` in src/content/index.ts), so they can neither duplicate nor
-    // clobber the top frame's list. host_permissions stays as-is.
-    {
-      matches: ['https://drive.google.com/*', 'https://youtube.googleapis.com/*'],
+      // Ad / tracker frames never hold a video worth summarizing, and the script
+      // would otherwise run in each of them on every page.
+      exclude_matches: [
+        '*://*.doubleclick.net/*',
+        '*://*.googlesyndication.com/*',
+        '*://*.adnxs.com/*',
+        '*://*.googleadservices.com/*',
+        '*://*.amazon-adsystem.com/*',
+        '*://*.taboola.com/*',
+        '*://*.outbrain.com/*',
+      ],
       js: ['src/content/index.ts'],
       run_at: 'document_idle',
       all_frames: true,
+      match_about_blank: true,
     },
   ],
   permissions: ['storage', 'activeTab', 'scripting', 'downloads', 'webRequest', 'offscreen'],

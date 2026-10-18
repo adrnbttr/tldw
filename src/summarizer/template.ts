@@ -35,6 +35,14 @@ interface Strings {
   glossary: string;
   toRemember: string;
   sources: Record<TranscriptSource, string>;
+  /** Human label of the video host, by provider id. */
+  providers: Record<string, string>;
+  /** Separator placed after a label: French typography wants a narrow no-break space before ':'. */
+  colon: string;
+  /** Title of a video whose page exposes none. */
+  untitledVideo: string;
+  /** Title of a YouTube video watched by URL whose page exposes none. */
+  youtubeVideo: string;
 }
 
 /** Localized section headings and labels for the rendered Markdown. */
@@ -55,6 +63,10 @@ const STRINGS: Record<Locale, Strings> = {
       audio_transcription: 'Audio transcription',
       youtube_video: 'YouTube video (Gemini)',
     },
+    providers: { youtube: 'YouTube', vimeo: 'Vimeo', drive: 'Google Drive', native: 'Page video' },
+    colon: ':',
+    untitledVideo: 'Untitled video',
+    youtubeVideo: 'YouTube video',
   },
   fr: {
     source: 'Source',
@@ -72,6 +84,15 @@ const STRINGS: Record<Locale, Strings> = {
       audio_transcription: 'Transcription audio',
       youtube_video: 'Vidéo YouTube (Gemini)',
     },
+    providers: {
+      youtube: 'YouTube',
+      vimeo: 'Vimeo',
+      drive: 'Google Drive',
+      native: 'Vidéo de la page',
+    },
+    colon: '\u202F:',
+    untitledVideo: 'Vidéo sans titre',
+    youtubeVideo: 'Vidéo YouTube',
   },
   es: {
     source: 'Fuente',
@@ -89,6 +110,15 @@ const STRINGS: Record<Locale, Strings> = {
       audio_transcription: 'Transcripción de audio',
       youtube_video: 'Vídeo de YouTube (Gemini)',
     },
+    providers: {
+      youtube: 'YouTube',
+      vimeo: 'Vimeo',
+      drive: 'Google Drive',
+      native: 'Vídeo de la página',
+    },
+    colon: ':',
+    untitledVideo: 'Vídeo sin título',
+    youtubeVideo: 'Vídeo de YouTube',
   },
   de: {
     source: 'Quelle',
@@ -106,11 +136,58 @@ const STRINGS: Record<Locale, Strings> = {
       audio_transcription: 'Audio-Transkription',
       youtube_video: 'YouTube-Video (Gemini)',
     },
+    providers: {
+      youtube: 'YouTube',
+      vimeo: 'Vimeo',
+      drive: 'Google Drive',
+      native: 'Video auf der Seite',
+    },
+    colon: ':',
+    untitledVideo: 'Video ohne Titel',
+    youtubeVideo: 'YouTube-Video',
   },
 };
 
 function strings(locale: Locale): Strings {
   return STRINGS[locale] ?? STRINGS.en;
+}
+
+/** Human label of a provider id in `locale` (English fallback; unknown ids are shown as-is). */
+export function providerLabel(provider: string, locale: Locale): string {
+  return strings(locale).providers[provider] ?? STRINGS.en.providers[provider] ?? provider;
+}
+
+/** Title used when the page exposes none, in the summary's output language. */
+export function fallbackTitle(kind: 'untitled' | 'youtube', locale: Locale): string {
+  const s = strings(locale);
+  return kind === 'youtube' ? s.youtubeVideo : s.untitledVideo;
+}
+
+/**
+ * Drops what the model left empty (degenerate `json_object` output): blank
+ * key points and takeaways, sections with neither heading nor body, glossary
+ * entries without a term; trims everything. Tolerates non-string leftovers in
+ * content stored by older builds. Shared by the Markdown render and exports.
+ */
+export function normalizeContent(content: SummaryContent): SummaryContent {
+  const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  const list = (v: unknown) => (Array.isArray(v) ? v.map(text).filter(Boolean) : []);
+  return {
+    tldr: text(content.tldr),
+    keyPoints: list(content.keyPoints),
+    sections: (Array.isArray(content.sections) ? content.sections : [])
+      .map((x) => ({ heading: text(x?.heading), body: text(x?.body) }))
+      .filter((x) => x.heading || x.body),
+    glossary: (Array.isArray(content.glossary) ? content.glossary : [])
+      .map((g) => ({ term: text(g?.term), definition: text(g?.definition) }))
+      .filter((g) => g.term),
+    takeaways: list(content.takeaways),
+  };
+}
+
+/** "Label:" with the locale's typography ("Source :" in French, with U+202F). */
+export function labelled(s: Strings, label: string): string {
+  return `${label}${s.colon}`;
 }
 
 export type TemplateStrings = Strings;
@@ -132,14 +209,18 @@ export function detectSummaryLocale(markdown: string): Locale {
   return 'en';
 }
 
+/** Single set of key-point bounds, shared by SCHEMA_HINT and the length directive. */
+export const KEY_POINTS_MIN = 5;
+export const KEY_POINTS_MAX = 8;
+
 export const SCHEMA_HINT = [
   'Reply STRICTLY with valid JSON, no surrounding text, in this shape:',
   '{',
   '  "tldr": "3 to 5 lines of synthesis",',
-  '  "keyPoints": ["5 to 10 key points"],',
+  `  "keyPoints": ["${KEY_POINTS_MIN} to ${KEY_POINTS_MAX} key points, ordered by importance, most important first"],`,
   '  "sections": [{"heading": "section title", "body": "details"}],',
   '  "glossary": [{"term": "term", "definition": "definition"}],',
-  '  "takeaways": ["actionable takeaways"]',
+  '  "takeaways": ["actionable takeaways, most important first"]',
   '}',
 ].join('\n');
 
@@ -147,8 +228,8 @@ function header(input: RenderInput, s: Strings): string[] {
   return [
     `# ${input.title}`,
     '',
-    `**${s.source}:** ${input.provider} · **${s.duration}:** ${input.durationLabel} · **${s.extractedOn}:** ${input.isoDate}`,
-    `**${s.method}:** ${s.sources[input.transcriptSource]}`,
+    `**${labelled(s, s.source)}** ${providerLabel(input.provider, input.locale)} · **${labelled(s, s.duration)}** ${input.durationLabel} · **${labelled(s, s.extractedOn)}** ${input.isoDate}`,
+    `**${labelled(s, s.method)}** ${s.sources[input.transcriptSource]}`,
     '',
   ];
 }
@@ -195,33 +276,42 @@ export function lengthParts(level: DetailLevel): LengthParts {
 /** Renders the structured summary to Markdown at the requested length. */
 export function renderSummary(input: RenderInput, level: DetailLevel): string {
   const s = strings(input.locale);
-  const { content } = input;
+  const content = normalizeContent(input.content);
   const parts = lengthParts(level);
   const lines: string[] = [...header(input, s)];
 
-  lines.push(`## ${s.inBrief}`, content.tldr.trim(), '');
-  lines.push(`## ${s.keyPoints}`);
-  for (const point of content.keyPoints.slice(0, parts.keyPoints)) lines.push(`- ${point.trim()}`);
-  lines.push('');
+  // A heading is only written over actual content.
+  if (content.tldr) lines.push(`## ${s.inBrief}`, content.tldr, '');
+  const points = content.keyPoints.slice(0, parts.keyPoints);
+  if (points.length) {
+    lines.push(`## ${s.keyPoints}`);
+    for (const point of points) lines.push(`- ${point}`);
+    lines.push('');
+  }
 
   if (parts.sections && content.sections.length > 0) {
     lines.push(`## ${s.development}`);
     for (const section of content.sections) {
-      lines.push(`### ${section.heading.trim()}`, section.body.trim(), '');
+      if (section.heading) lines.push(`### ${section.heading}`);
+      if (section.body) lines.push(section.body);
+      lines.push('');
     }
   }
 
   if (parts.glossary && content.glossary.length > 0) {
     lines.push(`## ${s.glossary}`);
     for (const { term, definition } of content.glossary) {
-      lines.push(`- **${term.trim()}** — ${definition.trim()}`);
+      lines.push(definition ? `- **${term}** — ${definition}` : `- **${term}**`);
     }
     lines.push('');
   }
 
-  lines.push(`## ${s.toRemember}`);
-  for (const item of content.takeaways.slice(0, parts.takeaways)) lines.push(`- ${item.trim()}`);
-  lines.push('');
+  const takeaways = content.takeaways.slice(0, parts.takeaways);
+  if (takeaways.length) {
+    lines.push(`## ${s.toRemember}`);
+    for (const item of takeaways) lines.push(`- ${item}`);
+    lines.push('');
+  }
 
   return finalize(lines);
 }

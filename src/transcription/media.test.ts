@@ -53,6 +53,27 @@ describe('classifyMedia — Google Drive', () => {
     expect(classifyMedia(embedUrl)).toBe('unknown');
   });
 
+  it('accepts the Drive stream hosts (*.c.drive.google.com, *.c.docs.google.com)', () => {
+    const drive =
+      'https://rr1---sn-abc.c.drive.google.com/videoplayback?expire=1&mime=video%2Fmp4&range=0-1';
+    const docs = 'https://rr2---sn-abc.c.docs.google.com/videoplayback?mime=audio%2Fmp4&itag=140';
+    expect(classifyMedia(drive)).toBe('progressive');
+    expect(classifyMedia(docs)).toBe('progressive');
+    expect(isGoogleVideoUrl(drive)).toBe(true);
+    expect(isGoogleVideoUrl(docs)).toBe(true);
+    expect(isMediaUrl(normalizeMediaUrl(drive))).toBe(true);
+  });
+
+  it('rejects look-alike hosts and paths', () => {
+    expect(isGoogleVideoUrl('https://notgooglevideo.com/videoplayback?mime=video%2Fmp4')).toBe(
+      false,
+    );
+    expect(
+      isGoogleVideoUrl('https://evil.example/googlevideo.com/videoplayback?mime=video/mp4'),
+    ).toBe(false);
+    expect(isGoogleVideoUrl('https://drive.google.com/videoplayback?mime=video%2Fmp4')).toBe(false);
+  });
+
   it('flags googlevideo URLs (normalized or not) for the range download path', () => {
     expect(isGoogleVideoUrl(googlevideoUrl)).toBe(true);
     expect(isGoogleVideoUrl(normalizeMediaUrl(googlevideoUrl))).toBe(true);

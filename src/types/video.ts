@@ -25,4 +25,10 @@ export interface DetectedVideo {
    */
   mediaSrc: string | null;
   isPlaying: boolean;
+  /**
+   * Frame (within the tab) the video was detected in, stamped by the worker from
+   * the message sender. Absent on the content script's own output. Used to target
+   * frame-bound actions (PRIME_MEDIA on a native `<video>`).
+   */
+  frameId?: number;
 }

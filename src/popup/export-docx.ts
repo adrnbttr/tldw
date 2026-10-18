@@ -1,6 +1,13 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 import type { Summary } from '@/types';
-import { templateStrings, detectSummaryLocale, lengthParts } from '@/summarizer/template';
+import {
+  templateStrings,
+  detectSummaryLocale,
+  lengthParts,
+  normalizeContent,
+  providerLabel,
+  labelled,
+} from '@/summarizer/template';
 import { isoDate, slugify } from '@/shared/format';
 
 /**
@@ -21,8 +28,10 @@ function bullets(items: string[]): Paragraph[] {
 }
 
 export function buildDocx(summary: Summary): Document {
-  const s = templateStrings(detectSummaryLocale(summary.markdown));
-  const c = summary.content;
+  const locale = detectSummaryLocale(summary.markdown);
+  const s = templateStrings(locale);
+  // Empty parts (degenerate model output) are skipped, headings included.
+  const c = normalizeContent(summary.content);
   const parts = lengthParts(summary.detailLevel);
   const children: Paragraph[] = [];
 
@@ -31,7 +40,7 @@ export function buildDocx(summary: Summary): Document {
     new Paragraph({
       children: [
         new TextRun({
-          text: `${s.source}: ${summary.provider}  ·  ${s.duration}: ${summary.durationLabel}  ·  ${s.extractedOn}: ${isoDate(new Date(summary.createdAt))}`,
+          text: `${labelled(s, s.source)} ${providerLabel(summary.provider, locale)}  ·  ${labelled(s, s.duration)} ${summary.durationLabel}  ·  ${labelled(s, s.extractedOn)} ${isoDate(new Date(summary.createdAt))}`,
           color: MUTED,
           size: 18,
         }),
@@ -43,7 +52,7 @@ export function buildDocx(summary: Summary): Document {
       spacing: { after: 200 },
       children: [
         new TextRun({
-          text: `${s.method}: ${s.sources[summary.transcriptSource]}`,
+          text: `${labelled(s, s.method)} ${s.sources[summary.transcriptSource]}`,
           color: MUTED,
           size: 18,
         }),
@@ -51,19 +60,23 @@ export function buildDocx(summary: Summary): Document {
     }),
   );
 
-  children.push(new Paragraph({ text: s.inBrief, heading: HeadingLevel.HEADING_1 }));
-  children.push(new Paragraph({ text: c.tldr.trim() }));
+  if (c.tldr) {
+    children.push(new Paragraph({ text: s.inBrief, heading: HeadingLevel.HEADING_1 }));
+    children.push(new Paragraph({ text: c.tldr }));
+  }
 
-  children.push(new Paragraph({ text: s.keyPoints, heading: HeadingLevel.HEADING_1 }));
-  children.push(...bullets(c.keyPoints.slice(0, parts.keyPoints)));
+  if (c.keyPoints.length) {
+    children.push(new Paragraph({ text: s.keyPoints, heading: HeadingLevel.HEADING_1 }));
+    children.push(...bullets(c.keyPoints.slice(0, parts.keyPoints)));
+  }
 
   if (parts.sections && c.sections.length > 0) {
     children.push(new Paragraph({ text: s.development, heading: HeadingLevel.HEADING_1 }));
     for (const section of c.sections) {
-      children.push(
-        new Paragraph({ text: section.heading.trim(), heading: HeadingLevel.HEADING_2 }),
-      );
-      children.push(new Paragraph({ text: section.body.trim() }));
+      if (section.heading) {
+        children.push(new Paragraph({ text: section.heading, heading: HeadingLevel.HEADING_2 }));
+      }
+      if (section.body) children.push(new Paragraph({ text: section.body }));
     }
   }
 
@@ -74,16 +87,18 @@ export function buildDocx(summary: Summary): Document {
         new Paragraph({
           bullet: { level: 0 },
           children: [
-            new TextRun({ text: `${term.trim()} — `, bold: true }),
-            new TextRun({ text: definition.trim() }),
+            new TextRun({ text: definition ? `${term} — ` : term, bold: true }),
+            new TextRun({ text: definition }),
           ],
         }),
       );
     }
   }
 
-  children.push(new Paragraph({ text: s.toRemember, heading: HeadingLevel.HEADING_1 }));
-  children.push(...bullets(c.takeaways.slice(0, parts.takeaways)));
+  if (c.takeaways.length) {
+    children.push(new Paragraph({ text: s.toRemember, heading: HeadingLevel.HEADING_1 }));
+    children.push(...bullets(c.takeaways.slice(0, parts.takeaways)));
+  }
 
   return new Document({
     styles: {

@@ -335,12 +335,40 @@ describe('createLogStore', () => {
 
     manual.append(entry('a'));
     manual.append(entry('b'));
-    expect(armed).toHaveLength(2);
-    expect(canceled).toBe(1); // the second append re-armed, canceling the first
+    // first append: debounce + max-wait; second re-arms only the debounce.
+    expect(armed).toHaveLength(3);
+    expect(canceled).toBe(1);
 
     armed[armed.length - 1]();
     await manual.flush();
 
     expect((await manual.readAll()).map((l) => l.msg)).toEqual(['a', 'b']);
+  });
+
+  it('skips an unfit newest entry instead of persisting nothing', async () => {
+    const small = createLogStore(area, { capacity: 10, budgetBytes: 2400 });
+    small.append(big('old'));
+    small.append({ ...big('huge'), data: 'x'.repeat(5000) });
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect((await small.readAll()).map((l) => l.msg)).toEqual(['old']);
+  });
+
+  it('keeps older entries when the newest one is unserializable', async () => {
+    store.append(entry('old'));
+    store.append({ t: 0, level: 'info', source: 'sw', msg: 'boom', data: { n: 10n } });
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect((await store.readAll()).map((l) => l.msg)).toEqual(['old']);
+  });
+
+  it('persists a steady stream within the max wait, even if the debounce keeps restarting', async () => {
+    for (let i = 0; i < 12; i++) {
+      store.append(entry(`m${i}`));
+      await vi.advanceTimersByTimeAsync(400); // never lets the 500 ms debounce close
+    }
+    expect(area.set).toHaveBeenCalled();
+    const persisted = area.set.mock.calls[0][0][LOGS_KEY] as LogEntry[];
+    expect(persisted.length).toBeGreaterThan(0);
   });
 });

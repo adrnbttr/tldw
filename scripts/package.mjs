@@ -1,5 +1,6 @@
-// Builds the extension and zips dist/ into a versioned, store-ready archive.
-// Source maps are excluded to keep the upload lean.
+// Runs the release gate (lint + tests + build + checks) and zips the exact dist/
+// it validated — no second build. Source maps are excluded.
+// `--allow-dirty` (local dry runs only) and `--skip-e2e` (no Chromium) are passed through to the gate.
 import { execSync } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -10,8 +11,17 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const zipName = `tldw-v${version}.zip`;
 
-console.log('› Building…');
-execSync('npm run build', { cwd: root, stdio: 'inherit' });
+const passthrough = ['--allow-dirty', '--skip-e2e']
+  .filter((flag) => process.argv.includes(flag))
+  .map((flag) => ` ${flag}`)
+  .join('');
+console.log('› Release check (builds dist/)…');
+try {
+  execSync(`node scripts/release-check.mjs${passthrough}`, { cwd: root, stdio: 'inherit' });
+} catch {
+  console.error('✗ release:check a échoué — rien n’a été empaqueté.');
+  process.exit(1);
+}
 
 rmSync(join(root, zipName), { force: true });
 

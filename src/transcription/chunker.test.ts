@@ -34,6 +34,29 @@ describe('planChunks', () => {
     expect(plans.map((p) => p.start)).toEqual([0, 720, 1440, 2160, 2880]);
   });
 
+  it('folds a tiny last chunk into the previous one (3601 s → no 1 s chunk)', () => {
+    const plans = planChunks({ durationSeconds: 3601, bytesPerSecond: 8000, overlapSeconds: 0 });
+    expect(plans).toHaveLength(5);
+    expect(plans[4]).toEqual({ index: 4, start: 2880, end: 3601 });
+  });
+
+  it('keeps a last chunk at or above the 30 s threshold', () => {
+    const plans = planChunks({ durationSeconds: 3630, bytesPerSecond: 8000, overlapSeconds: 0 });
+    expect(plans).toHaveLength(6);
+    expect(plans[5]).toEqual({ index: 5, start: 3600, end: 3630 });
+  });
+
+  it('never merges past the byte cap', () => {
+    // Byte-bound chunks: 100 s each at 1000 B/s under a 100 kB cap.
+    const plans = planChunks({
+      durationSeconds: 205,
+      bytesPerSecond: 1000,
+      maxBytes: 100_000,
+      overlapSeconds: 0,
+    });
+    expect(plans[plans.length - 1]).toMatchObject({ start: 200, end: 205 });
+  });
+
   it('honors an explicit maxChunkSeconds', () => {
     const plans = planChunks({
       durationSeconds: 3600,

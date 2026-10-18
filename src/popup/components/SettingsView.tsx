@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { DetailLevel, DownloadFormat, Settings, Theme, TranscriptionProvider } from '@/types';
 import { AVAILABLE_MODELS, DEFAULT_SETTINGS } from '@/types';
-import { getSettings, saveSettings } from '@/storage';
-import { clearLogs } from '../messaging';
-import { downloadDiagnosticReport, useDiagnosticCopy } from '../diagnostic-actions';
+import { clearHistory, getSettings, saveSettings } from '@/storage';
+import { useClearLogs, useDiagnosticCopy, useDiagnosticDownload } from '../diagnostic-actions';
 import type { Locale } from '@/i18n';
 import { SUPPORTED_LOCALES, LOCALE_LABELS, isLocale } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { Breadcrumb } from './Breadcrumb';
 import { applyTheme } from '../theme';
+import { KeyInput } from './KeyInput';
+import { modelOptions } from '../model-options';
 
 interface Props {
   onClose: () => void;
@@ -26,6 +27,7 @@ export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Pr
   const t = useI18n();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   useEffect(() => {
     void getSettings().then(setSettings);
@@ -53,19 +55,36 @@ export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Pr
   );
 
   const save = async () => {
-    await saveSettings(settings);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    try {
+      await saveSettings(settings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch {
+      setSaveFailed(true);
+      setTimeout(() => setSaveFailed(false), 1500);
+    }
   };
 
-  const { copied, copyDiagnostic } = useDiagnosticCopy();
-  const [cleared, setCleared] = useState(false);
+  const { copied, failed: copyFailed, copyDiagnostic } = useDiagnosticCopy();
+  const { failed: downloadFailed, download } = useDiagnosticDownload();
+  const { cleared, failed: clearFailed, clear } = useClearLogs();
 
-  const clear = async () => {
-    await clearLogs();
-    setCleared(true);
-    setTimeout(() => setCleared(false), 1500);
+  // Clear history: a two-step, inline confirmation (no native dialog in the popup).
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const [historyState, setHistoryState] = useState<'idle' | 'cleared' | 'failed'>('idle');
+  const doClearHistory = async () => {
+    setConfirmingClear(false);
+    try {
+      await clearHistory();
+      setHistoryState('cleared');
+    } catch {
+      setHistoryState('failed');
+    }
+    setTimeout(() => setHistoryState('idle'), 1500);
   };
+
+  // A stored model outside the list is shown as such (model-options.ts).
+  const models = modelOptions(settings.summaryModel, AVAILABLE_MODELS, t.settings);
 
   return (
     <div class="screen">
@@ -110,11 +129,12 @@ export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Pr
 
       <label class="field">
         <span>{t.settings.openRouterKey}</span>
-        <input
-          type="password"
+        <KeyInput
           value={settings.openRouterKey}
-          placeholder="sk-or-..."
-          onInput={(e) => update('openRouterKey', (e.target as HTMLInputElement).value)}
+          placeholder="sk-or-…"
+          onInput={(v) => update('openRouterKey', v)}
+          ariaLabel={t.settings.openRouterKey}
+          openRouter
         />
       </label>
 
@@ -137,11 +157,11 @@ export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Pr
       {settings.transcriptionProvider === 'openai' && (
         <label class="field">
           <span>{t.settings.transcriptionKey}</span>
-          <input
-            type="password"
+          <KeyInput
             value={settings.transcriptionKey}
             placeholder={t.settings.transcriptionPlaceholder}
-            onInput={(e) => update('transcriptionKey', (e.target as HTMLInputElement).value)}
+            onInput={(v) => update('transcriptionKey', v)}
+            ariaLabel={t.settings.transcriptionKey}
           />
         </label>
       )}
@@ -154,7 +174,7 @@ export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Pr
           value={settings.summaryModel}
           onChange={(e) => update('summaryModel', (e.target as HTMLSelectElement).value)}
         >
-          {AVAILABLE_MODELS.map((m) => (
+          {models.map((m) => (
             <option key={m.id} value={m.id}>
               {m.label}
             </option>
@@ -194,24 +214,62 @@ export function SettingsView({ onClose, onLocaleChange, onReplayOnboarding }: Pr
         </select>
       </label>
 
+      <h2 class="settings-section">{t.settings.sectionHistory}</h2>
+
+      {confirmingClear ? (
+        <div class="confirm-panel" role="alertdialog" aria-label={t.settings.clearHistory}>
+          <p>{t.settings.clearHistoryConfirm}</p>
+          <div class="actions">
+            <button class="secondary danger" onClick={() => void doClearHistory()}>
+              {t.settings.clearHistoryConfirmAction}
+            </button>
+            <button class="secondary" onClick={() => setConfirmingClear(false)}>
+              {t.settings.clearHistoryCancel}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div class="actions">
+          <button
+            class="secondary danger"
+            aria-live="polite"
+            onClick={() => setConfirmingClear(true)}
+          >
+            {historyState === 'failed'
+              ? t.settings.diagnosticFailed
+              : historyState === 'cleared'
+                ? t.settings.historyCleared
+                : t.settings.clearHistory}
+          </button>
+        </div>
+      )}
+
       <h2 class="settings-section">{t.settings.sectionDiagnostic}</h2>
 
       <p class="settings-hint">{t.settings.diagnosticHint}</p>
 
       <div class="actions">
         <button class="secondary" onClick={() => void copyDiagnostic()}>
-          {copied ? t.result.copied : t.settings.diagnosticCopy}
+          {copyFailed
+            ? t.settings.diagnosticFailed
+            : copied
+              ? t.result.copied
+              : t.settings.diagnosticCopy}
         </button>
-        <button class="secondary" onClick={() => void downloadDiagnosticReport()}>
-          {t.settings.diagnosticDownload}
+        <button class="secondary" onClick={() => void download()}>
+          {downloadFailed ? t.settings.diagnosticFailed : t.settings.diagnosticDownload}
         </button>
         <button class="secondary danger" onClick={() => void clear()}>
-          {cleared ? t.settings.logsCleared : t.settings.diagnosticClear}
+          {clearFailed
+            ? t.settings.diagnosticFailed
+            : cleared
+              ? t.settings.logsCleared
+              : t.settings.diagnosticClear}
         </button>
       </div>
 
-      <button class="primary" onClick={() => void save()}>
-        {saved ? t.settings.saved : t.settings.save}
+      <button class="primary" onClick={() => void save()} aria-live="polite">
+        {saveFailed ? t.result.failed : saved ? t.settings.saved : t.settings.save}
       </button>
 
       <button class="link-btn" onClick={onReplayOnboarding}>

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LogEntry } from './logger';
-import { createLogger, pushBounded, redact, sanitizeEntry } from './logger';
+import { createLogger, pushBounded, redact, redactString, sanitizeEntry } from './logger';
 
 describe('redact', () => {
   it('masks sk- style API keys', () => {
@@ -250,15 +250,147 @@ describe('sanitizeEntry', () => {
     expect(sanitizeEntry(raw)).toBeNull();
   });
 
-  it('drops oversized data but keeps the line', () => {
-    // Five near-2048-char strings survive redaction and blow the 8000 budget.
-    const data = Array.from({ length: 5 }, () => 'x'.repeat(3000));
+  it('shrinks oversized data progressively, keeping scalars and the code', () => {
+    const data = {
+      code: 'MEDIA_NOT_CAPTURABLE',
+      status: 403,
+      sources: Array.from({ length: 5 }, () => 'x'.repeat(3000)),
+    };
     const out = sanitizeEntry({ ...valid, msg: 'big', data });
     expect(out?.msg).toBe('big');
-    expect(out?.data).toBe('[dropped: oversized]');
+    const shrunk = out?.data as typeof data;
+    expect(shrunk.code).toBe('MEDIA_NOT_CAPTURABLE');
+    expect(shrunk.status).toBe(403);
+    expect(JSON.stringify(out).length).toBeLessThanOrEqual(8000);
   });
 
-  it('drops unserializable data', () => {
-    expect(sanitizeEntry({ ...valid, data: { count: 10n } })?.data).toBe('[dropped: oversized]');
+  it('truncates long arrays with a "+k more" marker', () => {
+    const data = { items: Array.from({ length: 2000 }, (_, i) => `item-${i}`) };
+    const out = sanitizeEntry({ ...valid, data });
+    const items = (out?.data as { items: unknown[] }).items;
+    expect(items.at(-1)).toMatch(/^…\+\d+ more$/);
+    expect(items.length).toBeLessThan(30);
+  });
+
+  it('drops data only when nothing smaller fits', () => {
+    const data: Record<string, string> = {};
+    for (let i = 0; i < 2000; i++) data[`k${i}`] = 'v';
+    expect(sanitizeEntry({ ...valid, data })?.data).toBe('[dropped: oversized]');
+  });
+
+  it('stringifies bigints instead of failing', () => {
+    expect(sanitizeEntry({ ...valid, data: { count: 10n } })?.data).toEqual({ count: '10n' });
+  });
+
+  it('drops data that throws while being read', () => {
+    const data = {
+      get boom(): string {
+        throw new Error('nope');
+      },
+    };
+    expect(sanitizeEntry({ ...valid, data })?.data).toBe('[dropped: oversized]');
+  });
+});
+
+describe('redaction hardening', () => {
+  it.each([
+    ['https://x.test/a?api_key=SECRETVAL&b=1', 'SECRETVAL'],
+    ['https://x.test/a?apiKey=SECRETVAL', 'SECRETVAL'],
+    ['x.test/a?foo=1&refresh_token=SECRETVAL', 'SECRETVAL'],
+    ['x.test/a?id_token=SECRETVAL', 'SECRETVAL'],
+    ['x.test/a?access_token=SECRETVAL', 'SECRETVAL'],
+    ['x.test/a?lsig=SECRETVAL&b', 'SECRETVAL'],
+    ['x.test/a?sig=SECRETVAL', 'SECRETVAL'],
+    ['x.test/a?auth=SECRETVAL', 'SECRETVAL'],
+    ['x.test/a#token=SECRETVAL', 'SECRETVAL'],
+    ['x.test/a;key=SECRETVAL', 'SECRETVAL'],
+    ['x.test/a?client_secret=SECRETVAL', 'SECRETVAL'],
+    ['x.test/a?my_secret_thing=SECRETVAL', 'SECRETVAL'],
+    ['token=SECRETVAL', 'SECRETVAL'],
+    ['{"apiKey":"SECRETVAL","n":1}', 'SECRETVAL'],
+    ['{"Set-Cookie": "sid=SECRETVAL"}', 'SECRETVAL'],
+    ['{"password":"SECRETVAL"}', 'SECRETVAL'],
+    ['Authorization: Basic dXNlcjpTRUNSRVRWQUw=', 'dXNlcjpTRUNSRVRWQUw'],
+    ['Authorization: Bearer SECRETVAL', 'SECRETVAL'],
+    ['Cookie: sid=SECRETVAL; a=b', 'SECRETVAL'],
+    ['key gsk_abcdefghijklmnopqrstuvwxyz0123 end', 'gsk_abcdefghij'],
+    ['key AIzaSyA-abcdefghijklmnopqrstuv end', 'AIzaSyA'],
+    ['key sk-ant-api03-abcdef end', 'sk-ant'],
+    ['key sk-or-v1-abcdef0123 end', 'sk-or-v1'],
+  ])('masks %s', (input, secret) => {
+    const out = redactString(input);
+    expect(out).not.toContain(secret);
+    expect(out).toContain('[REDACTED]');
+  });
+
+  it('masks path-embedded tokens and IPs', () => {
+    const out = redactString(
+      'v.test/videoplayback/expire/1/ei/Y/ip/203.0.113.42/sig/ZZZ/lsig/TOKEN123/x.mp4 ' +
+        'vod.vimeocdn.com/exp=1712345678~acl=%2Fabc%2F~hmac=0123abcd/seg.m4s ' +
+        'drive.google.com/file/d/1AbCdEfGhIjKlMnOp/view from 198.51.100.7',
+    );
+    for (const leak of [
+      '203.0.113.42',
+      'ZZZ',
+      'TOKEN123',
+      '0123abcd',
+      '1712345678',
+      '%2Fabc%2F',
+      '1AbCdEfGhIjKlMnOp',
+      '198.51.100.7',
+    ]) {
+      expect(out).not.toContain(leak);
+    }
+  });
+
+  it('leaves version strings and plain text alone', () => {
+    expect(redactString('Chrome/120.0.0.0 Basic information keyframe=3')).toBe(
+      'Chrome/120.0.0.0 Basic information keyframe=3',
+    );
+  });
+
+  it('masks cookie fields', () => {
+    expect(redact({ cookie: 'a', 'set-cookie': 'b', Cookie: 'c', sig: 'd' })).toEqual({
+      cookie: '[REDACTED]',
+      'set-cookie': '[REDACTED]',
+      Cookie: '[REDACTED]',
+      sig: '[REDACTED]',
+    });
+  });
+
+  it('keeps own props and cause of an Error, redacted', () => {
+    const err = Object.assign(new Error('boom', { cause: new Error('inner sk-abcdef123') }), {
+      code: 'API_ERROR',
+      status: 429,
+      providerMessage: 'bad key sk-secret123',
+      apiKey: 'zzz',
+    });
+    const out = redact(err) as Record<string, unknown> & { cause: { message: string } };
+    expect(out.code).toBe('API_ERROR');
+    expect(out.status).toBe(429);
+    expect(out.providerMessage).not.toContain('sk-secret123');
+    expect(out.apiKey).toBe('[REDACTED]');
+    expect(out.cause.message).not.toContain('sk-abcdef123');
+  });
+
+  it('converts Map and Set to plain data, checking Map keys', () => {
+    const out = redact({
+      m: new Map<string, unknown>([
+        ['a', 1],
+        ['apiKey', 'zzz'],
+      ]),
+      s: new Set([1, 'sk-abcdef123']),
+    }) as { m: unknown; s: unknown[] };
+    expect(out.m).toEqual({ a: 1, apiKey: '[REDACTED]' });
+    expect(out.s).toEqual([1, '[REDACTED]']);
+  });
+
+  it('only flags true cycles as circular, not shared references', () => {
+    const shared = { v: 1 };
+    const out = redact({ a: shared, b: shared, list: [shared, shared] }) as Record<string, unknown>;
+    expect(JSON.stringify(out)).not.toContain('Circular');
+    const loop: Record<string, unknown> = {};
+    loop.self = loop;
+    expect(redact(loop)).toEqual({ self: '[Circular]' });
   });
 });

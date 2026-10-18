@@ -61,6 +61,16 @@ describe('snapshotOf', () => {
 });
 
 describe('markInterrupted', () => {
+  it('keeps the stable video keys, so the popup can match an interrupted job', () => {
+    const out = markInterrupted({
+      jobs: { v1: running('v1') },
+      lastJobId: 'v1',
+      keys: { v1: 'drive:F1' },
+    });
+    expect(out.keys).toEqual({ v1: 'drive:F1' });
+    expect(out.jobs.v1).toMatchObject({ phase: 'error', code: 'INTERRUPTED' });
+  });
+
   it('converts persisted running jobs into a typed INTERRUPTED error', () => {
     const snapshot = markInterrupted({
       jobs: { v1: running('v1'), v2: done('v2'), 'v-err': failed },
@@ -141,5 +151,16 @@ describe('sessionJobStore', () => {
       },
       lastJobId: 'v1',
     });
+  });
+});
+
+describe('progress persistence', () => {
+  it('carries a running job progress through snapshotOf', () => {
+    const state: JobState = {
+      ...(running('v1') as Extract<JobState, { phase: 'running' }>),
+      progress: { percent: 42, phase: 'transcription', done: 600, total: 1400, unit: 'seconds' },
+    };
+    const snap = snapshotOf(new Map([['v1', state]]), 'v1');
+    expect(JSON.parse(JSON.stringify(snap)).jobs.v1.progress.percent).toBe(42);
   });
 });

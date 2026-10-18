@@ -116,9 +116,9 @@
 
       <p>
         <strong>tldw</strong> is a browser extension that turns the videos on a page — YouTube,
-        Vimeo, or any native HTML5 video — into structured Markdown summaries. It runs entirely in
-        your browser with your own API keys. Source code:
-        <a href="https://github.com/adrnbttr/tldw">github.com/adrnbttr/tldw</a>.
+        Vimeo, Google Drive, embedded players, or any HTML5 video — into structured summaries
+        (exported as PDF or Word). It runs entirely in your browser with your own API keys. Source
+        code: <a href="https://github.com/adrnbttr/tldw">github.com/adrnbttr/tldw</a>.
       </p>
 
       <h2>Short version</h2>
@@ -129,9 +129,13 @@
 
       <h2>What is stored, and where</h2>
       <p>
-        Everything lives in <code>chrome.storage.local</code>, on your machine only: your API keys,
-        your preferences, and a local history of the summaries you generate (a configurable limit,
-        default 50). You can clear it at any time by removing the extension.
+        Everything lives in your browser profile, on your machine only: your API keys and
+        preferences and a local history of the summaries you generate
+        (<code>chrome.storage.local</code>, default 50 summaries), a rolling activity log with
+        secrets masked (the last 500 entries; the “Clear logs” button in Settings erases it), and
+        short-lived job state in
+        <code>chrome.storage.session</code>, which is cleared when the browser closes. Removing the
+        extension deletes all of it.
       </p>
 
       <h2>Where your data goes</h2>
@@ -148,8 +152,18 @@
         </tr>
         <tr>
           <td>Extracted audio</td>
-          <td>Your transcription provider (your API key)</td>
+          <td>OpenRouter, or OpenAI if you choose Whisper (your API key)</td>
           <td>Only when the audio fallback runs</td>
+        </tr>
+        <tr>
+          <td>YouTube video URL</td>
+          <td>OpenRouter (routed to Google AI Studio)</td>
+          <td>Only for a YouTube video without usable captions</td>
+        </tr>
+        <tr>
+          <td>Caption, metadata and media requests</td>
+          <td>The video's own site (YouTube, Vimeo, the host serving the file)</td>
+          <td>The same requests your browser makes to play the video</td>
         </tr>
         <tr>
           <td>API keys</td>
@@ -186,7 +200,7 @@
         <a href="https://github.com/adrnbttr/tldw/issues">GitHub</a>.
       </p>
 
-      <footer>Last updated: 2026-07-25 · tldw is open-source under the MIT license.</footer>
+      <footer>Last updated: 2026-10-18 · tldw is open-source under the MIT license.</footer>
     </div>
   </body>
 </html>

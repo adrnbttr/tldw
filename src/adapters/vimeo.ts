@@ -1,6 +1,7 @@
 import type { DetectedVideo, Transcript, TranscriptSegment } from '@/types';
 import { TldwError, buildFullText } from '@/types';
 import type { Adapter } from './types';
+import { pickTrackBy } from './tracks';
 
 /**
  * Vimeo adapter — level 1 only (F4).
@@ -9,8 +10,6 @@ import type { Adapter } from './types';
  * suggests no text track. We still attempt level 1 (query the player config for
  * `text_tracks`) before the orchestrator falls back to audio transcription.
  */
-
-const PREFERRED_LANGUAGES = ['fr', 'en'];
 
 interface VimeoTextTrack {
   lang: string;
@@ -31,14 +30,14 @@ export const vimeoAdapter: Adapter = {
     return video.provider === 'vimeo' && !!video.externalId;
   },
 
-  async extractCaptions(video, signal) {
+  async extractCaptions(video, signal, options) {
     const config = await fetchPlayerConfig(video.externalId, signal);
     const tracks = config.request?.text_tracks ?? [];
     if (tracks.length === 0) {
       throw new TldwError('NO_CAPTIONS_AVAILABLE', 'No text tracks on this Vimeo video.');
     }
 
-    const track = pickTrack(tracks);
+    const track = pickTrack(tracks, options?.outputLanguage ? [options.outputLanguage] : []);
     const segments = await fetchVtt(track.url, signal);
     if (segments.length === 0) {
       throw new TldwError('NO_CAPTIONS_AVAILABLE', 'Vimeo text track was empty.');
@@ -61,12 +60,14 @@ async function fetchPlayerConfig(videoId: string, signal?: AbortSignal): Promise
   return (await res.json()) as VimeoConfig;
 }
 
-export function pickTrack(tracks: VimeoTextTrack[]): VimeoTextTrack {
-  const score = (t: VimeoTextTrack): number => {
-    const idx = PREFERRED_LANGUAGES.indexOf(t.lang);
-    return idx === -1 ? 0 : PREFERRED_LANGUAGES.length - idx;
-  };
-  return [...tracks].sort((a, b) => score(b) - score(a))[0];
+export function pickTrack(tracks: VimeoTextTrack[], preferred: string[] = []): VimeoTextTrack {
+  // Vimeo marks machine captions with kind "captions" + an "auto" label/lang suffix.
+  const isAuto = (t: VimeoTextTrack): boolean =>
+    /auto/i.test(t.kind ?? '') || /auto/i.test(t.label ?? '') || /-x-autogen$/i.test(t.lang);
+  return pickTrackBy(tracks, preferred, (t) => ({
+    lang: t.lang.replace(/-x-autogen$/i, ''),
+    auto: isAuto(t),
+  }));
 }
 
 function absoluteUrl(url: string): string {

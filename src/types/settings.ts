@@ -48,12 +48,101 @@ export interface Settings {
   historyLimit: number;
 }
 
+/**
+ * Model registry — the single source of truth, one list per role.
+ *
+ * Verified live against https://openrouter.ai/api/v1/models on 2026-10-18
+ * (prices in USD per 1M tokens, input/output; none has an expiration_date):
+ * - google/gemini-3.1-flash-lite  0.25/1.5   ctx 1,048,576  text,image,file,audio,video  structured_outputs
+ * - google/gemini-3.5-flash-lite  0.30/2.5   ctx 1,048,576  text,image,file,audio,video  structured_outputs
+ * - google/gemini-3.5-flash       1.50/9.0   ctx 1,048,576  text,image,file,audio,video  structured_outputs
+ * - anthropic/claude-haiku-5.5    0.10/0.5   ctx 1,000,000  text,image,file              structured_outputs
+ * - anthropic/claude-sonnet-5.5   2.00/10.0  ctx 1,000,000  text,image,file              structured_outputs
+ * Retired: google/gemini-2.5-* (expire 2026-10-20), anthropic/claude-sonnet-4.
+ */
+/** Localized qualifier shown after a model's name in Settings (i18n `settings.modelQualifiers`). */
+export type ModelQualifier = 'bestValue' | 'fast' | 'highestFidelity';
+
+export interface ModelInfo {
+  id: string;
+  /** Model name, language-neutral (the qualifier is translated separately). */
+  label: string;
+  qualifier?: ModelQualifier;
+  /** Context window in tokens. */
+  contextLength: number;
+  /** Supports response_format json_schema (strict). */
+  structuredOutputs: boolean;
+}
+
+const GEMINI_CTX = 1_048_576;
+
+/** Summary models (text in → JSON out). */
+export const SUMMARY_MODELS: ModelInfo[] = [
+  {
+    id: 'google/gemini-3.1-flash-lite',
+    label: 'Gemini 3.1 Flash Lite',
+    qualifier: 'bestValue',
+    contextLength: GEMINI_CTX,
+    structuredOutputs: true,
+  },
+  {
+    id: 'google/gemini-3.5-flash-lite',
+    label: 'Gemini 3.5 Flash Lite',
+    contextLength: GEMINI_CTX,
+    structuredOutputs: true,
+  },
+  {
+    id: 'google/gemini-3.5-flash',
+    label: 'Gemini 3.5 Flash',
+    contextLength: GEMINI_CTX,
+    structuredOutputs: true,
+  },
+  {
+    id: 'anthropic/claude-haiku-5.5',
+    label: 'Claude Haiku 5.5',
+    qualifier: 'fast',
+    contextLength: 1_000_000,
+    structuredOutputs: true,
+  },
+  {
+    id: 'anthropic/claude-sonnet-5.5',
+    label: 'Claude Sonnet 5.5',
+    qualifier: 'highestFidelity',
+    contextLength: 1_000_000,
+    structuredOutputs: true,
+  },
+];
+
+/** Models able to take audio input (audio transcription fallback). */
+export const AUDIO_MODELS: ModelInfo[] = SUMMARY_MODELS.filter((m) => m.id.startsWith('google/'));
+
+/** Models able to take a video URL as input (YouTube direct-watch path). */
+export const VIDEO_MODELS: ModelInfo[] = SUMMARY_MODELS.filter((m) => m.id.startsWith('google/'));
+
+/** Old model id → current replacement, applied when repairing stored settings. */
+export const RETIRED_MODELS: Record<string, string> = {
+  'google/gemini-2.5-flash': 'google/gemini-3.1-flash-lite',
+  'google/gemini-2.5-flash-lite': 'google/gemini-3.1-flash-lite',
+  'google/gemini-2.5-pro': 'google/gemini-3.5-flash',
+  'google/gemini-2.0-flash-001': 'google/gemini-3.1-flash-lite',
+  'google/gemini-2.0-flash': 'google/gemini-3.1-flash-lite',
+  'anthropic/claude-sonnet-4': 'anthropic/claude-sonnet-5.5',
+  'anthropic/claude-3.5-sonnet': 'anthropic/claude-sonnet-5.5',
+  'anthropic/claude-3.7-sonnet': 'anthropic/claude-sonnet-5.5',
+  'anthropic/claude-3.5-haiku': 'anthropic/claude-haiku-5.5',
+};
+
+/** Registry entry for a model id, or undefined for a custom/unknown model. */
+export function getModelInfo(id: string): ModelInfo | undefined {
+  return SUMMARY_MODELS.find((m) => m.id === id);
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   openRouterKey: '',
   transcriptionKey: '',
   transcriptionProvider: 'openrouter',
-  audioModel: 'google/gemini-2.5-flash',
-  summaryModel: 'google/gemini-2.5-flash',
+  audioModel: AUDIO_MODELS[0].id,
+  summaryModel: SUMMARY_MODELS[0].id,
   outputLanguage: 'en',
   uiLanguage: 'en',
   theme: 'system',
@@ -64,12 +153,8 @@ export const DEFAULT_SETTINGS: Settings = {
   historyLimit: 50,
 };
 
-/**
- * OpenRouter models surfaced in Settings (spec §3.7). Ordered best value first;
- * Gemini Flash is the default for its quality/price ratio, Claude Sonnet for
- * maximum format fidelity.
- */
-export const AVAILABLE_MODELS: Array<{ id: string; label: string }> = [
-  { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (best value)' },
-  { id: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4 (highest fidelity)' },
-];
+/** Model used to watch a YouTube URL directly (needs video input). */
+export const YOUTUBE_VIDEO_MODEL = VIDEO_MODELS[0].id;
+
+/** Models surfaced in Settings (summary role). */
+export const AVAILABLE_MODELS: ModelInfo[] = SUMMARY_MODELS;

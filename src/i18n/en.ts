@@ -1,32 +1,64 @@
 import type { Messages } from './types';
+import { formatNumber, plural } from './format';
+
+const n = (v: number) => formatNumber('en', v);
 
 export const en: Messages = {
+  locale: 'en',
   nav: { videos: 'Videos' },
   list: {
     historyTooltip: 'History',
     settingsTooltip: 'Settings',
     rescanTooltip: 'Rescan this page for videos',
-    emptyTitle: 'No video found on this page.',
-    emptyHint: 'Start playback, then reopen this menu.',
+    emptyTitle: 'No video detected on this page',
+    emptyHint: 'Play the video for a few seconds, then scan the page again.',
+    emptySites: 'Works with YouTube, Vimeo, Google Drive and most video players on websites.',
+    rescan: 'Scan again',
+    loading: 'Looking for videos…',
     noTitle: 'Untitled video',
     videoLabel: 'Video',
     untreatable: 'not supported',
     summarize: 'Summarize',
+    retry: 'Retry',
     summarizeSelection: (count) => `Summarize selection (${count})`,
     summarizeAll: (count) => `Summarize all (${count})`,
-    view: 'View',
+    view: 'View summary',
+    regenerate: 'Regenerate',
     copyReport: 'Copy report',
     overview: (total, done) =>
-      `${total} video${total > 1 ? 's' : ''}${done > 0 ? ` · ${done} summarized` : ''}`,
+      `${total} ${plural('en', total, { one: 'video', other: 'videos' })}${done > 0 ? ` · ${done} summarized` : ''}`,
     batchProgress: (done, total) => `${done}/${total}`,
+    openSettings: 'Open settings',
+    addCredits: 'Add credits',
+    technicalDetails: 'Technical details',
+    retryIn: (s) => `Retry in ${s}\u00A0s.`,
+  },
+  progress: {
+    label: 'Progress',
+    percent: (p) => `${p}%`,
+    starting: 'Preparing…',
+    captions: 'Fetching captions…',
+    queued: (k) => `Waiting (${k} ${plural('en', k, { one: 'video', other: 'videos' })} ahead)…`,
+    download: (d, t) => `Downloading · ${d} / ${t}\u00A0MB`,
+    downloadItems: (d, t) => `Downloading · ${d} / ${t} segments`,
+    downloading: 'Downloading…',
+    extracting: 'Extracting audio…',
+    transcription: (d, t) => `Transcription · ${d} / ${t} of video`,
+    transcribing: 'Transcribing…',
+    summarizing: 'Summarizing…',
+    eta: (m) =>
+      m >= 60
+        ? `≈\u00A0${Math.floor(m / 60)}\u00A0h ${String(m % 60).padStart(2, '0')}\u00A0min left`
+        : `≈\u00A0${m}\u00A0min left`,
   },
   transcription: {
     fetchingMedia: 'Fetching the media stream…',
     extractingAudio: 'Extracting the audio track…',
     assembling: (index, total) => `Segments ${index}/${total}`,
-    downloading: (done, total) => `Downloaded ${done}/${total} MB`,
+    downloading: (done, total) => `Downloaded ${n(done)}/${n(total)}\u00A0MB`,
     transcribing: (index, total, clock) => `${index}/${total} · ${clock}`,
     transcribingOne: 'Transcribing…',
+    queued: 'Waiting for the previous video to finish…',
   },
   processing: {
     back: '← Back',
@@ -47,10 +79,13 @@ export const en: Messages = {
     heading: 'Summary',
     method: (source) => `Method: ${source}`,
     length: 'Length',
-    downloadPdf: 'Download (PDF)',
-    downloadWord: 'Download (Word)',
-    copy: 'Copy',
+    downloadPdf: 'Download as PDF',
+    downloadWord: 'Download as Word',
+    copy: 'Copy text',
     copied: 'Copied ✓',
+    failed: 'Failed ✗',
+    regenerate: 'Regenerate',
+    partialNotice: 'Partial summary: only part of the video could be transcribed.',
   },
   settings: {
     back: '← Back',
@@ -62,6 +97,8 @@ export const en: Messages = {
     transcriptionKey: 'OpenAI API key (Whisper)',
     transcriptionPlaceholder: 'optional',
     model: 'Summary model',
+    modelQualifiers: { bestValue: 'best value', fast: 'fast', highestFidelity: 'highest fidelity' },
+    customModel: (id) => `Custom model: ${id}`,
     outputLanguage: 'Summary language',
     uiLanguage: 'Interface language',
     detailLevel: 'Summary length',
@@ -77,9 +114,16 @@ export const en: Messages = {
     diagnosticHint:
       'The report is generated locally, nothing leaves your device, and it never contains your API keys.',
     diagnosticCopy: 'Copy the report',
-    diagnosticDownload: 'Download',
+    diagnosticDownload: 'Download the report',
     diagnosticClear: 'Clear logs',
     logsCleared: 'Logs cleared ✓',
+    diagnosticFailed: 'Failed ✗',
+    sectionHistory: 'History',
+    clearHistory: 'Clear history',
+    clearHistoryConfirm: 'Permanently delete all saved summaries?',
+    clearHistoryConfirmAction: 'Clear',
+    clearHistoryCancel: 'Cancel',
+    historyCleared: 'History cleared ✓',
     replayOnboarding: 'Replay the intro',
     save: 'Save',
     saved: 'Saved ✓',
@@ -88,6 +132,8 @@ export const en: Messages = {
     back: '← Back',
     heading: 'History',
     empty: 'No summary saved yet.',
+    delete: 'Delete',
+    deleteLabel: (title) => `Delete “${title}”`,
   },
   batch: {
     back: '← Back',
@@ -96,6 +142,12 @@ export const en: Messages = {
     current: (title) => `In progress: ${title}`,
     downloadAll: (count) => `Download all (${count}) as one PDF`,
   },
+  keyInput: {
+    show: 'Show',
+    hide: 'Hide',
+    invalidFormat:
+      'This doesn’t look like an OpenRouter key, which starts with “sk-or-”. Check what you pasted.',
+  },
   sources: {
     youtube_captions: 'YouTube captions',
     vimeo_captions: 'Vimeo captions',
@@ -103,28 +155,38 @@ export const en: Messages = {
     youtube_video: 'YouTube video (Gemini)',
   },
   errors: {
-    NO_VIDEO_DETECTED: 'No video found on this page. Start playback, then try again.',
+    NO_VIDEO_DETECTED: 'No video detected on this page. Start playback, then try again.',
     NO_CAPTIONS_AVAILABLE:
-      'This video has no captions and audio transcription is not configured. Add a transcription key in the settings.',
+      'This video has no captions and audio transcription is not configured. Add a transcription key in Settings.',
     CAPTIONS_BLOCKED:
       'YouTube is currently blocking caption downloads for this video — a YouTube restriction, not a tldw bug.',
-    MISSING_OPENROUTER_KEY: 'OpenRouter key missing. Add it in the settings.',
+    MISSING_OPENROUTER_KEY: 'OpenRouter key missing. Add it in Settings.',
     MISSING_TRANSCRIPTION_KEY:
-      'Transcription key missing. Add it in the settings to enable the audio fallback.',
+      'Transcription key missing. Add it in Settings to enable audio transcription.',
     QUOTA_EXCEEDED: 'API quota exceeded.',
+    INVALID_API_KEY: 'Invalid OpenRouter API key. Check it in Settings.',
+    INVALID_TRANSCRIPTION_KEY: 'Invalid OpenAI (transcription) key. Check it in Settings.',
+    INSUFFICIENT_CREDITS:
+      'Not enough OpenRouter credits. Add credits at openrouter.ai/credits, then retry.',
+    RATE_LIMITED: 'Too many requests (rate limit). Wait a moment, then retry.',
+    MODEL_UNAVAILABLE:
+      'The selected model is unavailable on OpenRouter. Choose another model in Settings.',
+    CONTEXT_TOO_LONG:
+      'The transcript is too long for the selected model. Choose a model with a larger context in Settings.',
     MEDIA_NOT_CAPTURABLE:
       'The video stream could not be retrieved. This host may not be supported.',
     MEDIA_NEEDS_PLAYBACK:
       'Play the video for a few seconds, then try again — the stream needs to load first.',
     MEDIA_PROTECTED:
-      'The content is protected (encrypted). Audio transcription cannot be performed.',
+      'Access denied by the video server. Play the video again, then retry. DRM-protected videos are not supported.',
     MEDIA_TOO_LARGE: 'This video is too large to process in memory. Try a shorter one.',
     AUDIO_EXTRACTION_FAILED: 'Isolating the audio track failed.',
     TRANSCRIPTION_API_ERROR: 'The transcription service returned an error.',
     TIMEOUT: 'Processing exceeded the time limit. Try a shorter video.',
     UNSUPPORTED_PROVIDER: 'This host is not supported yet.',
-    SUMMARY_API_ERROR: 'Generating the summary failed.',
-    INTERRUPTED: 'Interrupted — the extension worker was restarted. You can relaunch it.',
+    SUMMARY_API_ERROR: 'Writing the summary failed. Try again.',
+    CANCELLED: 'Cancelled.',
+    INTERRUPTED: 'Interrupted: the extension restarted in the background. Run the summary again.',
     UNKNOWN: 'An unexpected error occurred.',
   },
   onboarding: {
@@ -144,7 +206,8 @@ export const en: Messages = {
     keyTitle: 'Connect OpenRouter',
     keyBody:
       'tldw uses your own OpenRouter key to generate summaries — one account, no subscription, pay only for what you use.',
-    keyCost: 'A summary costs a fraction of a cent. Your key stays on your device.',
+    keyCost:
+      'A summary costs about a cent or less with captions, roughly 5–10 cents for a 1-hour video transcribed from audio. Your key stays on your device.',
     keyGet: 'Get a free key ↗',
     keyPlaceholder: 'Paste your OpenRouter key (sk-or-…)',
     keyLater: 'You can add it later in Settings.',

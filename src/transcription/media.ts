@@ -11,19 +11,33 @@ export type MediaKind = 'vimeo_master' | 'hls' | 'dash' | 'progressive' | 'segme
 export interface MediaCandidate {
   url: string;
   kind: MediaKind;
+  /**
+   * Frame (within the tab) whose request was captured, from webRequest
+   * `details.frameId`. Absent for sources not observed on the network (a
+   * native `<video>`'s own src, Vimeo config). Lets the audio fallback prefer
+   * captures attributable to the requested video's frame.
+   */
+  frameId?: number;
 }
 
 const VIMEO_MASTER = /\/(?:master|playlist)\.(?:json|mpd)(\?|$)/i;
 const HLS = /\.m3u8(\?|$)/i;
 const DASH = /\.mpd(\?|$)/i;
 const PROGRESSIVE = /\.mp4(\?|$)/i;
-const SEGMENT = /(\.ts|\.m4s|segment|vimeocdn\.com\/.*\/(?:audio|video))/i;
+// `.ts` / `.m4s` only as the path's extension (not `.tsv`, `.tsx`), and
+// `segment` only followed by a number (`segment-12`, `segment_3`), never a
+// word such as `/api/segments`.
+const SEGMENT = /(\.(?:ts|m4s)(?:[?#]|$)|segment[-_]\d|vimeocdn\.com\/.*\/(?:audio|video))/i;
 
-// Google Drive / YouTube serve media from googlevideo.com/videoplayback as byte
-// ranges of a whole file: no file extension, the `mime` query param carries the
-// content type (video/mp4, audio/mp4, …). Only genuine media mimes are kept, so
-// non-media videoplayback requests stay `unknown`.
-const GOOGLEVIDEO = /googlevideo\.com\/videoplayback(\?|$)/i;
+// Google Drive / YouTube serve media from `/videoplayback` as byte ranges of a
+// whole file: no file extension, the `mime` query param carries the content
+// type (video/mp4, audio/mp4, …). Only genuine media mimes are kept, so
+// non-media videoplayback requests stay `unknown`. Hosts: `*.googlevideo.com`
+// (YouTube, older Drive) and the Drive stream hosts `*.c.drive.google.com` /
+// `*.c.docs.google.com`. Anchored on the host so a look-alike domain
+// (`notgooglevideo.com`, a path containing the name) never matches.
+const GOOGLEVIDEO =
+  /^https?:\/\/(?:[^/?#]*\.)?(?:googlevideo\.com|c\.drive\.google\.com|c\.docs\.google\.com)\/videoplayback(?:[?#]|$)/i;
 const MEDIA_MIME = /[?&]mime=(?:audio|video)(?:%2f|\/)/i;
 const AUDIO_MIME = /[?&]mime=audio(?:%2f|\/)/i;
 
@@ -42,7 +56,10 @@ export function isMediaUrl(url: string): boolean {
   return classifyMedia(url) !== 'unknown';
 }
 
-/** True for googlevideo /videoplayback URLs (Google Drive / YouTube media). */
+/**
+ * True for googlevideo-family /videoplayback URLs (Google Drive / YouTube media:
+ * `*.googlevideo.com`, `*.c.drive.google.com`, `*.c.docs.google.com`).
+ */
 export function isGoogleVideoUrl(url: string): boolean {
   return GOOGLEVIDEO.test(url);
 }

@@ -2,6 +2,7 @@ import type { DetectedVideo, Transcript, TranscriptSegment } from '@/types';
 import { TldwError, buildFullText } from '@/types';
 import { fetchTextViaPage } from '@/background/page-fetch';
 import type { Adapter } from './types';
+import { pickTrackBy } from './tracks';
 
 /**
  * YouTube adapter — nominal path (F3).
@@ -10,8 +11,6 @@ import type { Adapter } from './types';
  * high. We read the watch page's `ytInitialPlayerResponse`, list the caption
  * tracks, pick one by priority, then fetch the track in `json3` format.
  */
-
-const PREFERRED_LANGUAGES = ['fr', 'en'];
 
 interface CaptionTrack {
   baseUrl: string;
@@ -27,7 +26,7 @@ export const youtubeAdapter: Adapter = {
     return video.provider === 'youtube' && !!video.externalId;
   },
 
-  async extractCaptions(video, signal) {
+  async extractCaptions(video, signal, options) {
     const diag: string[] = [];
     try {
       const tracks = await fetchCaptionTracks(video.externalId, diag, signal);
@@ -35,9 +34,9 @@ export const youtubeAdapter: Adapter = {
         throw new TldwError('NO_CAPTIONS_AVAILABLE', 'No caption tracks.', diag.join(' '));
       }
 
-      const track = pickTrack(tracks);
+      const track = pickTrack(tracks, options?.outputLanguage ? [options.outputLanguage] : []);
       diag.push(`picked=${track?.languageCode ?? '?'} base=${track?.baseUrl ? 'y' : 'NO'}`);
-      const segments = await fetchTrackSegments(track, diag, signal);
+      const segments = await fetchTrackSegments(track, diag, signal, options?.tabId);
       if (segments.length === 0) {
         // A track exists but its content came back empty everywhere → YouTube is
         // gating it behind a proof-of-origin token.
@@ -50,6 +49,9 @@ export const youtubeAdapter: Adapter = {
 
       return normalize(video, track.languageCode, segments);
     } catch (err) {
+      // Cancelled or timed out: rethrown untouched, never disguised as "no
+      // captions" (which would cascade into a fallback with a dead signal).
+      if (signal?.aborted) throw err;
       if (err instanceof TldwError) throw err;
       // Any unexpected failure becomes a typed, diagnosable NO_CAPTIONS.
       throw new TldwError(
@@ -180,15 +182,9 @@ export function extractPlayerResponse(html: string): PlayerResponse | null {
   return null;
 }
 
-/** Priority: manual > automatic, preferred language first (spec §3.3). */
-export function pickTrack(tracks: CaptionTrack[]): CaptionTrack {
-  const score = (t: CaptionTrack): number => {
-    const manual = t.kind !== 'asr' ? 2 : 0;
-    const langIdx = PREFERRED_LANGUAGES.indexOf(t.languageCode);
-    const langScore = langIdx === -1 ? 0 : (PREFERRED_LANGUAGES.length - langIdx) * 4;
-    return manual + langScore;
-  };
-  return [...tracks].sort((a, b) => score(b) - score(a))[0];
+/** Spoken language first, then `preferred`, then manual over auto (see pickTrackBy). */
+export function pickTrack(tracks: CaptionTrack[], preferred: string[] = []): CaptionTrack {
+  return pickTrackBy(tracks, preferred, (t) => ({ lang: t.languageCode, auto: t.kind === 'asr' }));
 }
 
 interface Json3Event {
@@ -201,13 +197,14 @@ async function fetchTrackSegments(
   track: CaptionTrack,
   diag: string[],
   signal?: AbortSignal,
+  tabId?: number,
 ): Promise<TranscriptSegment[]> {
   if (!track?.baseUrl) return [];
   // json3 (best — has timings) then the default XML, which YouTube serves when
   // json3 comes back empty. Anonymous (no cookies) is how timedtext expects it.
-  const json3 = await fetchTimedtext(track.baseUrl, 'json3', diag, signal);
+  const json3 = await fetchTimedtext(track.baseUrl, 'json3', diag, signal, tabId);
   if (json3.length > 0) return json3;
-  return fetchTimedtext(track.baseUrl, '', diag, signal);
+  return fetchTimedtext(track.baseUrl, '', diag, signal, tabId);
 }
 
 async function fetchTimedtext(
@@ -215,6 +212,7 @@ async function fetchTimedtext(
   fmt: string,
   diag: string[],
   signal?: AbortSignal,
+  tabId?: number,
 ): Promise<TranscriptSegment[]> {
   const url = new URL(baseUrl);
   if (fmt) url.searchParams.set('fmt', fmt);
@@ -227,7 +225,7 @@ async function fetchTimedtext(
 
   // YouTube serves empty timedtext to the service worker — retry from the page.
   if (!raw) {
-    const viaPage = await fetchTextViaPage(url.toString());
+    const viaPage = await fetchTextViaPage(url.toString(), tabId);
     diag.push(`vp(${label})=${viaPage == null ? 'null' : 'len' + viaPage.trim().length}`);
     if (viaPage && viaPage.trim()) raw = viaPage.trim();
   }
