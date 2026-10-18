@@ -6,9 +6,99 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-18
+
+### Fixed
+
+- **Video detection works on every site again.** In 0.3.0 the content script could only
+  load on Google Drive (two manifest entries on the same file made the bundler restrict
+  its web-accessible resources), so YouTube, Vimeo and native videos were not detected.
+  A single entry now runs in every frame, and `release:check` verifies the loader can
+  load everywhere.
+- **Default models replaced before retirement.** `google/gemini-2.5-flash` is retired on
+  OpenRouter on 2026-10-20 and `anthropic/claude-sonnet-4` is gone. Defaults move to
+  `google/gemini-3.1-flash-lite`; retired models in existing settings are migrated
+  automatically, valid custom choices are kept.
+- **Long audio jobs are reliable.** The service worker is kept alive for the whole job;
+  if it dies anyway, the offscreen document stops (no credits spent for nothing) and
+  orphan documents are closed. Audio jobs run one at a time in a queue, the same video
+  is never processed twice, a short or silent final chunk no longer loses the whole
+  transcript, the download uses an inactivity timeout instead of a fixed 10-minute cap,
+  and memory is bounded during the download.
+- **Never the wrong video.** The tab is fixed when you click, captures from another page
+  or player are not reused, a lone stream segment is never taken for the whole video,
+  and partial or uncertain transcripts are not cached.
+- **Cancel is a real cancel** (also for queued and batch items), shown as a neutral
+  "Cancelled" state; every phase has a time limit, so a job can no longer hang at 97 %.
+- **Audio is transcribed in its spoken language** instead of being translated into the
+  summary language.
+- **Privacy:** signed URLs, path tokens, IP addresses, Drive file ids and ffmpeg
+  metadata (GPS, titles) no longer reach logs or the diagnostic report.
+- **Security:** popup-only commands and offscreen requests are refused from any other
+  sender; detection messages are validated and scoped to their own frame.
+- History entries no longer overwrite each other (native videos, concurrent saves), and
+  the summary cache now accounts for output language and model.
+
+### Added
+
+- **Progress bar** on every running video: percent, phase in plain words (e.g.
+  "Transcription · 24:10 / 58:30 de vidéo"), queue position and a time-remaining
+  estimate; it survives closing and reopening the popup.
+- **Much broader detection:** videos inside cross-origin iframes (Wistia, Loom,
+  Dailymotion, Brightcove, JW Player, Kaltura, Panopto, Streamable, Twitch…), shadow-DOM
+  players, click-to-play facades (`lite-youtube`, lazy `data-src` iframes, Plyr),
+  YouTube Shorts / live / mobile URLs, Vimeo channels and showcases, players revealed
+  later (tabs, accordions, modals); ads, hidden and decorative videos are ignored. The
+  list survives the service worker restarting and single-page navigation.
+- **Actionable errors:** distinct messages for an invalid key, missing credits, rate
+  limits (with a live countdown), an unavailable model or an invalid transcription key,
+  with **Open settings** / **Add credits** buttons and collapsible technical details.
+- **Regenerate** a summary, delete history entries, and **Clear history** in Settings.
+- Summary headings, labels and durations follow the output language (also in PDF and
+  Word exports).
+- `npm run test:e2e` (65 detection cases) and `npm run test:e2e:pipeline` (full audio
+  pipeline with stubbed APIs) run in headless Chromium and gate every release.
+
+### Changed
+
+- Popup polish: accessible contrast in both themes, localized numbers and plurals,
+  reviewed French/German/Spanish copy, empty and loading states, key field with
+  show/hide, visible keyboard focus.
+- Long transcripts are summarized in a single call when the model's context allows
+  (model-aware threshold), with parallel condensation otherwise and a JSON-mode
+  fallback.
+- Faster popup after the service worker restarts (≈ 45 ms instead of up to 850 ms) and
+  a lighter content script on heavy pages; the network listener no longer wakes the
+  worker on every request.
+- Documentation rewritten (README, install, architecture, privacy, new troubleshooting
+  guide); release procedure commits before checking and fails fast.
+
 ## [0.3.0] - 2026-10-17
 
 ### Added
+
+- **Google Drive videos.** Drive players are detected, the underlying `googlevideo`
+  stream is captured, and the audio is downloaded by HTTP ranges so long files can be
+  transcribed. The content script also runs inside Drive's nested player iframes
+  (`drive.google.com`, `youtube.googleapis.com`) so the player can be driven.
+- **Windowed audio for 1-hour videos.** Audio extraction and transcription now work on
+  bounded windows instead of the whole file, keeping memory flat on long videos.
+- **Resilient long jobs.** OpenRouter requests are retried on transient failures,
+  each phase has its own timeout, and running jobs are persisted so they survive the
+  service worker being suspended.
+- **Diagnostic report.** Settings -> Diagnostic -> Copy / Download / Clear: a report
+  assembled from logs persisted across every context (worker, offscreen, content,
+  popup), with secrets and signed URLs masked. Everything stays local, nothing is
+  ever sent. A logging core (redaction, persistent buffer) backs it, with
+  instrumentation of the critical paths.
+- **Release tooling.** `npm run build:test` and `npm run release:check` gate a
+  release, packaging no longer requires the `zip` binary, and `docs/RELEASING.md`
+  documents the procedure.
+
+## [0.2.0] - 2026-07-30
+
+### Added
+
 
 - **Multi-video dashboard.** The popup list is now a live dashboard: every video on
   the page shows its status inline (idle · summarizing… · done), each result is one
@@ -54,18 +144,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   native media URL and the orchestrator skips straight to transcription.
 - Repo hygiene: `SECURITY.md`, `CODE_OF_CONDUCT.md`, `.editorconfig`, Dependabot,
   `docs/SCREENSHOTS.md`, and a one-command `install.sh`.
-- **Diagnostic report.** Settings → Diagnostic → Copy / Download / Clear: a report
-  assembled from logs persisted across every context (worker, offscreen, content,
-  popup), with secrets and signed URLs masked — everything stays local, nothing is
-  ever sent.
-- **Release tooling.** `npm run build:test` and `npm run release:check` gate a
-  release, packaging no longer requires the `zip` binary, and `docs/RELEASING.md`
-  documents the procedure.
 
 ### Fixed
 
 - The popup now restores a running job or batch after being closed and reopened
   (jobs were keyed by an ephemeral detection id).
+
+### Initial foundations
 
 - **Phase 1 — Core & nominal path.** Video detection (`MutationObserver`), YouTube
   caption adapter, OpenRouter summary generation with a versioned template, Preact
@@ -86,5 +171,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Normalized `Transcript` contract shared across all extraction paths.
 - Isolated `Transcriber` interface for the audio fallback.
 
-[Unreleased]: https://github.com/adrnbttr/tldw/commits/main
+[Unreleased]: https://github.com/adrnbttr/tldw/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/adrnbttr/tldw/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/adrnbttr/tldw/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/adrnbttr/tldw/releases/tag/v0.2.0
